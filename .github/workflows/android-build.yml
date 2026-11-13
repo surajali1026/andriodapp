@@ -9,6 +9,7 @@ jobs:
   build:
     name: Build Debug APK and Emulator Smoke Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Repository
@@ -27,7 +28,7 @@ jobs:
         run: |
           mkdir -p android/gradle/wrapper
           if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
-            curl -sLo android/gradle/wrapper/gradle-wrapper.jar "https://raw.githubusercontent.com/gradle/gradle/v8.7.0/gradle/wrapper/gradle-wrapper.jar"
+            curl -fsSL -o android/gradle/wrapper/gradle-wrapper.jar "https://raw.githubusercontent.com/gradle/gradle/v8.7.0/gradle/wrapper/gradle-wrapper.jar"
           fi
           chmod +x android/gradlew
 
@@ -51,13 +52,16 @@ jobs:
       - name: Run Android emulator smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
+          target: google_apis
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            set -eu
-            adb wait-for-device
+            set -euxo pipefail
+            adb devices
+            adb shell getprop sys.boot_completed | grep -q 1
             adb shell settings put global window_animation_scale 0
             adb shell settings put global transition_animation_scale 0
             adb shell settings put global animator_duration_scale 0
@@ -65,11 +69,11 @@ jobs:
             adb logcat -c
             adb shell am force-stop com.tradingview.binancefutures || true
             adb shell monkey -p com.tradingview.binancefutures -c android.intent.category.LAUNCHER 1
-            sleep 25
+            sleep 15
             adb shell pidof com.tradingview.binancefutures
             adb shell dumpsys activity activities | grep -F com.tradingview.binancefutures
             adb logcat -d -v brief > android-emulator-logcat.txt
-            if grep -A 20 'FATAL EXCEPTION' android-emulator-logcat.txt | grep -F 'com.tradingview.binancefutures'; then
+            if grep -A 30 'FATAL EXCEPTION' android-emulator-logcat.txt | grep -F 'com.tradingview.binancefutures'; then
               echo 'App crashed during emulator launch'
               exit 1
             fi
@@ -95,6 +99,7 @@ jobs:
         with:
           name: app-debug.apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload Android test reports

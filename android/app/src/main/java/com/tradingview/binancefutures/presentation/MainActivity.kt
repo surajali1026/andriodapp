@@ -6,6 +6,9 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Build
 import android.content.pm.PackageManager
+import com.google.firebase.messaging.FirebaseMessaging
+import java.net.HttpURLConnection
+import java.net.URL
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowInsetsCompat
@@ -42,6 +45,36 @@ import com.tradingview.binancefutures.presentation.viewmodel.ChartViewModel
 
 class MainActivity : ComponentActivity() {
 
+    private fun registerPushToken() {
+        val prefs = getSharedPreferences("tradingview_binance_prefs", MODE_PRIVATE)
+        val deviceId = prefs.getString("push_device_id", null) ?: java.util.UUID.randomUUID().toString().also {
+            prefs.edit().putString("push_device_id", it).apply()
+        }
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            Thread {
+                var connection: HttpURLConnection? = null
+                try {
+                    connection = (URL("https://jolly-hall-eb84suraj-trading-alerts.surajali1026.workers.dev/api/device/register").openConnection() as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        connectTimeout = 10000
+                        readTimeout = 10000
+                        doOutput = true
+                        setRequestProperty("Content-Type", "application/json")
+                    }
+                    val body = """{"deviceId":"$deviceId","token":"$token","platform":"android"}"""
+                    connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    android.util.Log.i("TradingFCM", "Push token registration HTTP ${connection.responseCode}")
+                } catch (error: Exception) {
+                    android.util.Log.e("TradingFCM", "Push token registration failed", error)
+                } finally {
+                    connection?.disconnect()
+                }
+            }.start()
+        }.addOnFailureListener { error ->
+            android.util.Log.e("TradingFCM", "Could not get FCM token", error)
+        }
+    }
+
     private fun toggleScreenOrientation() {
         requestedOrientation = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -52,6 +85,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerPushToken()
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {

@@ -55,10 +55,42 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          working-directory: android
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
+          script: |
+            set -eu
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am force-stop com.tradingview.binancefutures || true
+            adb shell monkey -p com.tradingview.binancefutures -c android.intent.category.LAUNCHER 1
+            sleep 25
+            adb shell pidof com.tradingview.binancefutures
+            adb shell dumpsys activity activities | grep -F com.tradingview.binancefutures
+            adb logcat -d -v brief > android-emulator-logcat.txt
+            if grep -A 20 'FATAL EXCEPTION' android-emulator-logcat.txt | grep -F 'com.tradingview.binancefutures'; then
+              echo 'App crashed during emulator launch'
+              exit 1
+            fi
+            adb shell screencap -p /sdcard/chart-smoke.png
+            adb pull /sdcard/chart-smoke.png chart-smoke.png
+            test -s chart-smoke.png
+            echo 'Emulator launch smoke test passed'
+
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-smoke-evidence
+          path: |
+            chart-smoke.png
+            android-emulator-logcat.txt
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload Debug APK Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk

@@ -72,7 +72,7 @@ export default {
       return json({ ok: true, id });
     }
 
-    const deleteMatch = url.pathname.match(/^\\/api\\/alerts\\/([a-f0-9-]+)$/i);
+    const deleteMatch = url.pathname.match(/^\/api\/alerts\/([a-f0-9-]+)$/i);
     if (deleteMatch && request.method === "DELETE") {
       await env.ALERTS_DB.prepare("DELETE FROM alerts WHERE id = ?").bind(deleteMatch[1]).run();
       return json({ ok: true });
@@ -90,11 +90,11 @@ function base64url(value) {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function pemToArrayBuffer(pem) {
-  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -120,7 +120,7 @@ async function getFcmAccessToken(serviceAccount) {
   const bytes = new Uint8Array(signature);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const assertion = unsigned + "." + btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  const assertion = unsigned + "." + btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },

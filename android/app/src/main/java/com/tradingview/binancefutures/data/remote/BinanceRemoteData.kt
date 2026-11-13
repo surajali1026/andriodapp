@@ -197,18 +197,29 @@ class BinanceRemoteDataSource(
         }
     }
 
-    fun observeLiveKline(symbol: String, timeframe: Timeframe): Flow<Candle> = callbackFlow {
+    fun observeLiveKline(
+        symbol: String,
+        timeframe: Timeframe,
+        priceType: com.tradingview.binancefutures.domain.model.PriceType = com.tradingview.binancefutures.domain.model.PriceType.LAST
+    ): Flow<Candle> = callbackFlow {
         val interval = getBinanceSupportedInterval(timeframe)
-        val stream = "${symbol.lowercase()}@kline_$interval"
+        val stream = if (priceType == com.tradingview.binancefutures.domain.model.PriceType.LAST) {
+            "${symbol.lowercase()}@kline_$interval"
+        } else {
+            // Binance mark-price stream carries both mark price (p) and index price (i).
+            "${symbol.lowercase()}@markPrice@1s"
+        }
         val request = Request.Builder().url("$wsBaseUrl/$stream").build()
+        var aggregate: Candle? = null
+        val bucketSize = timeframe.durationMs
 
         val webSocket = websocketClient.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
                     val root = gson.fromJson(text, com.google.gson.JsonObject::class.java)
-                    if (root.has("k")) {
+                    if (priceType == com.tradingview.binancefutures.domain.model.PriceType.LAST && root.has("k")) {
                         val k = root.getAsJsonObject("k")
-                        val candle = Candle(
+                        trySend(Candle(
                             time = k.get("t").asLong,
                             open = k.get("o").asFloat,
                             high = k.get("h").asFloat,
@@ -216,11 +227,27 @@ class BinanceRemoteDataSource(
                             close = k.get("c").asFloat,
                             volume = k.get("v").asFloat,
                             isClosed = k.get("x")?.asBoolean ?: false
-                        )
-                        trySend(candle)
+                        ))
+                    } else if (root.has("p") && root.has("i")) {
+                        val priceText = if (priceType == com.tradingview.binancefutures.domain.model.PriceType.MARK) {
+                            root.get("p").asString
+                        } else {
+                            root.get("i").asString
+                        }
+                        val price = priceText.toFloatOrNull() ?: return
+                        if (!price.isFinite() || price <= 0f) return
+                        val eventTime = root.get("E")?.asLong ?: System.currentTimeMillis()
+                        val bucket = (eventTime / bucketSize) * bucketSize
+                        val previous = aggregate
+                        aggregate = if (previous == null || previous.time != bucket) {
+                            Candle(bucket, price, price, price, price, 0f, false)
+                        } else {
+                            previous.copy(high = maxOf(previous.high, price), low = minOf(previous.low, price), close = price, isClosed = false)
+                        }
+                        aggregate?.let { trySend(it) }
                     }
                 } catch (e: Exception) {
-                    // ignore json parse error
+                    // Ignore malformed market stream messages; the next tick will recover.
                 }
             }
 

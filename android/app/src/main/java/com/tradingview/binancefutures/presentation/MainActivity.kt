@@ -144,7 +144,10 @@ class MainActivity : ComponentActivity() {
                                 onSelectTimeframe = { viewModel.selectTimeframe(it) },
                                 onOpenCustomTimeframe = { isCustomTfOpen = true },
                                 onSelectPriceType = { viewModel.setPriceType(it) },
-                                onOpenAlerts = { isAlertsOpen = true },
+                                onOpenAlerts = {
+                                    alertDraftPrice = uiState.candles.lastOrNull()?.close ?: 0f
+                                    isAlertsOpen = true
+                                },
                                 onToggleFullScreen = { isFullScreen = true },
                                 onToggleOrientation = { toggleScreenOrientation() }
                             )
@@ -162,6 +165,7 @@ class MainActivity : ComponentActivity() {
                                 symbol = uiState.symbol,
                                 timeframe = uiState.timeframe.displayName,
                                 priceType = uiState.priceType.name,
+                                alerts = uiState.alerts.filter { it.symbol == uiState.symbol && it.isEnabled && !it.isTriggered },
                                 modifier = Modifier.fillMaxSize()
                             )
 

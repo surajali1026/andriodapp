@@ -31,4 +31,21 @@ class MainActivitySmokeTest {
         assertTrue("Invalid OHLC data should be rejected",
             !NativeChartEngine.validateOhlc(100f, 90f, 110f, 105f))
     }
+    @Test
+    fun lightweightChartsLibraryAndPriceLevelAlertButtonAreBundled() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val libraryBytes = activity.assets.open("lightweight-charts.standalone.production.js").use {
+                    it.readBytes()
+                }
+                assertTrue("TradingView Lightweight Charts asset must be bundled locally", libraryBytes.size > 100_000)
+
+                val html = activity.assets.open("tradingview_chart.html").bufferedReader().use { it.readText() }
+                assertTrue("Chart must load the bundled local library", html.contains("lightweight-charts.standalone.production.js"))
+                assertTrue("Chart must expose the price-level alert plus button", html.contains("id=\"pricePlus\""))
+                assertTrue("Chart plus button must call the Android alert bridge", html.contains("createAlertAtPrice"))
+            }
+        }
+    }
+
 }

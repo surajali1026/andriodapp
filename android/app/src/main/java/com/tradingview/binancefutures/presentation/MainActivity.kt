@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             // Watchlist Button
                                             IconButton(
-                                                onClick = { isWatchlistOpen = true },
+                                                onClick = { selectedMainTab = "WATCHLIST" },
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(Icons.Default.FormatListBulleted, contentDescription = "Watchlist", tint = TVPrimaryBlue, modifier = Modifier.size(16.dp))
@@ -260,7 +260,7 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                                             ) {
-                                                listOf(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1).forEach { tf ->
+                                                favoriteTimeframes.sortedBy { it.durationMs }.forEach { tf ->
                                                     val isSel = tf == uiState.timeframe
                                                     Surface(
                                                         onClick = { viewModel.selectTimeframe(tf) },

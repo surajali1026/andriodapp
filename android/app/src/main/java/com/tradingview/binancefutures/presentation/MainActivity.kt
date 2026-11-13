@@ -113,6 +113,14 @@ class MainActivity : ComponentActivity() {
                 var isFullScreen by remember { mutableStateOf(false) }
                 var alertDraftPrice by remember { mutableFloatStateOf(0f) }
                 var selectedMainTab by remember { mutableStateOf("CHART") }
+                val chartPrefs = remember { getSharedPreferences("tradingview_binance_prefs", MODE_PRIVATE) }
+                var favoriteTimeframes by remember {
+                    mutableStateOf(
+                        chartPrefs.getStringSet("favorite_timeframes", null)
+                            ?.mapNotNull { Timeframe.fromInterval(it) }?.toSet()
+                            ?: setOf(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
+                    )
+                }
 
                 LaunchedEffect(isFullScreen) {
                     val bars = WindowInsetsControllerCompat(window, window.decorView)
@@ -150,6 +158,7 @@ class MainActivity : ComponentActivity() {
                                 currentPair = currentPair,
                                 timeframe = uiState.timeframe,
                                 priceType = uiState.priceType,
+                                favoriteTimeframes = favoriteTimeframes.sortedBy { it.durationMs },
                                 alertsCount = uiState.alerts.filter { it.symbol == uiState.symbol && it.isEnabled && !it.isTriggered }.size,
                                 isFullScreen = false,
                                 onOpenWatchlist = { selectedMainTab = "WATCHLIST" },
@@ -375,7 +384,11 @@ class MainActivity : ComponentActivity() {
                         isOpen = isCustomTfOpen,
                         onDismiss = { isCustomTfOpen = false },
                         currentTimeframe = uiState.timeframe,
-                        onSelectTimeframe = { viewModel.selectTimeframe(it) }
+                        onSelectTimeframe = {
+                            viewModel.selectTimeframe(it)
+                            favoriteTimeframes = favoriteTimeframes + it
+                            chartPrefs.edit().putStringSet("favorite_timeframes", favoriteTimeframes.map { tf -> tf.interval }.toSet()).apply()
+                        }
                     )
                 }
             }

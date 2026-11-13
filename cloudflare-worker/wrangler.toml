@@ -5,4 +5,8 @@ compatibility_date = "2026-11-13"
 [triggers]
 crons = ["* * * * *"]
 
-# D1 database binding will be added after creating the free D1 database.
+[[d1_databases]]
+binding = "ALERTS_DB"
+database_name = "suraj-trading-alerts-db"
+database_id = "8427a84c-b443-421e-a5c0-89bd17b219af"
+migrations_dir = "migrations"

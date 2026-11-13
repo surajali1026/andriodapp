@@ -292,8 +292,8 @@ class MainActivity : ComponentActivity() {
                         alerts = uiState.alerts.filter { it.symbol == uiState.symbol },
                         onAddAlert = { price, cond, sound, vibrate ->
                             viewModel.addAlert(uiState.symbol, price, cond, sound, vibrate)
-                            viewModel.triggerDeviceVibration(this@MainActivity)
                         },
+                        onTestSound = { viewModel.testAlertSound() },
                         onToggleAlert = { viewModel.toggleAlertEnabled(it) },
                         onDeleteAlert = { viewModel.deleteAlert(it) }
                     )

@@ -1,0 +1,8 @@
+name = "suraj-trading-alerts"
+main = "src/index.js"
+compatibility_date = "2026-11-13"
+
+[triggers]
+crons = ["* * * * *"]
+
+# D1 database binding will be added after creating the free D1 database.

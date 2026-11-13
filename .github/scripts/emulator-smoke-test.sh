@@ -22,9 +22,23 @@ if [ "$booted" != "1" ]; then
   exit 1
 fi
 
-adb shell settings put global window_animation_scale 0
-adb shell settings put global transition_animation_scale 0
-adb shell settings put global animator_duration_scale 0
+# Hosted emulators occasionally drop ADB while applying animation settings.
+# These settings are optional; retry briefly, but do not fail a valid APK build
+# solely because the emulator settings service is temporarily unavailable.
+for setting in window_animation_scale transition_animation_scale animator_duration_scale; do
+  applied=""
+  for attempt in 1 2 3; do
+    if adb shell settings put global "$setting" 0 >/dev/null 2>&1; then
+      applied="yes"
+      break
+    fi
+    adb wait-for-device || true
+    sleep 2
+  done
+  if [ "$applied" != "yes" ]; then
+    echo "::warning::Could not set $setting; continuing with emulator defaults."
+  fi
+done
 
 test -s "$APK"
 adb install -r "$APK"

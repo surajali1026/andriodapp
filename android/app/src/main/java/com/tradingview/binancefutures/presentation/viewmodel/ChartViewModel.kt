@@ -18,6 +18,7 @@ import com.tradingview.binancefutures.data.repository.TradingRepository
 import com.tradingview.binancefutures.data.repository.TradingRepositoryImpl
 import com.tradingview.binancefutures.domain.model.*
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,7 @@ class ChartViewModel @JvmOverloads constructor(
     private var pollJob: Job? = null
     private var serverTimeJob: Job? = null
     private var previousPrice: Float? = null
+    private var loadRequestId: Long = 0L
     private var activeAlertRingtone: Ringtone? = null
 
     init {
@@ -140,7 +142,8 @@ class ChartViewModel @JvmOverloads constructor(
 
     fun selectSymbol(symbol: String) {
         if (_uiState.value.symbol == symbol) return
-        _uiState.value = _uiState.value.copy(symbol = symbol)
+        loadRequestId += 1L
+        _uiState.value = _uiState.value.copy(symbol = symbol, candles = emptyList(), isLoading = true, connectionStatus = ConnectionStatus.CONNECTING, selectedDrawingId = null, activeDrawingTool = null)
         previousPrice = null
         loadCandles(symbol, _uiState.value.timeframe, _uiState.value.priceType)
     }
@@ -189,67 +192,59 @@ class ChartViewModel @JvmOverloads constructor(
     }
 
     private fun loadCandles(symbol: String, tf: Timeframe, pType: PriceType = _uiState.value.priceType) {
+        loadRequestId += 1L
+        val requestId = loadRequestId
         loadJob?.cancel()
         wsJob?.cancel()
         pollJob?.cancel()
         loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                connectionStatus = ConnectionStatus.CONNECTING,
-                errorMessage = null
-            )
+            _uiState.value = _uiState.value.copy(isLoading = true, connectionStatus = ConnectionStatus.CONNECTING, errorMessage = null)
             try {
                 val history = repository.getHistoricalCandles(symbol, tf, pType)
-                _uiState.value = _uiState.value.copy(
-                    candles = history,
-                    isLoading = false,
-                    connectionStatus = ConnectionStatus.CONNECTED
-                )
-                if (history.isNotEmpty()) {
-                    previousPrice = history.last().close
-                }
-
-                // 1. WebSocket Live Stream with persistent auto-reconnection loop
+                if (!isActive || requestId != loadRequestId) return@launch
+                _uiState.value = _uiState.value.copy(candles = history, isLoading = false, connectionStatus = if (history.isEmpty()) ConnectionStatus.RECONNECTING else ConnectionStatus.CONNECTED)
+                previousPrice = history.lastOrNull()?.close
                 wsJob = launch {
-                    while (isActive) {
+                    while (isActive && requestId == loadRequestId) {
                         try {
                             repository.getLiveCandleStream(symbol, tf)
-                                .catch { 
-                                    _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                                .catch { error ->
+                                    if (error is CancellationException) throw error
+                                    if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
                                 }
                                 .collect { updatedCandle ->
-                                    _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.CONNECTED)
-                                    handleCandleUpdate(updatedCandle)
+                                    if (isActive && requestId == loadRequestId && _uiState.value.symbol == symbol && _uiState.value.timeframe == tf && _uiState.value.priceType == pType) {
+                                        _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.CONNECTED)
+                                        handleCandleUpdate(updatedCandle)
+                                    }
                                 }
-                        } catch (e: Exception) {
-                            _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
                         }
-                        delay(2500L) // Persistent auto-reconnect after 2.5s if WebSocket disconnects
+                        delay(2500L)
                     }
                 }
-
-                // 2. Gentle Fallback Poller (runs every 10s only when disconnected, preventing socket exhaustion & OOM)
                 pollJob = launch {
-                    while (isActive) {
+                    while (isActive && requestId == loadRequestId) {
                         delay(10_000L)
                         try {
                             if (_uiState.value.connectionStatus != ConnectionStatus.CONNECTED) {
                                 val latest = repository.getHistoricalCandles(symbol, tf, pType)
-                                if (latest.isNotEmpty()) {
-                                    handleCandleUpdate(latest.last())
+                                if (isActive && requestId == loadRequestId && _uiState.value.symbol == symbol && _uiState.value.timeframe == tf && _uiState.value.priceType == pType) {
+                                    latest.lastOrNull()?.let { handleCandleUpdate(it) }
                                 }
                             }
-                        } catch (e: Exception) {
-                            // ignore transient network hiccup
-                        }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) { }
                     }
                 }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    connectionStatus = ConnectionStatus.ERROR,
-                    errorMessage = e.message
-                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(isLoading = false, connectionStatus = ConnectionStatus.ERROR, errorMessage = error.message)
             }
         }
     }

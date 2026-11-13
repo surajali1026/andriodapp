@@ -29,6 +29,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import com.tradingview.binancefutures.domain.model.*
 import com.tradingview.binancefutures.presentation.ui.theme.*
@@ -73,6 +75,7 @@ fun CandlestickChartCompose(
     onDeleteDrawing: (String) -> Unit = {},
     onSwipeNextCoin: () -> Unit = {},
     onSwipePreviousCoin: () -> Unit = {},
+    onChartAlertRequest: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var candleWidth by remember { mutableFloatStateOf(24f) }
@@ -80,6 +83,8 @@ fun CandlestickChartCompose(
     var priceScaleMultiplier by remember { mutableFloatStateOf(1f) }
     var pricePanOffset by remember { mutableFloatStateOf(0f) }
     var crosshairPosition by remember { mutableStateOf<Offset?>(null) }
+    var alertTap by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
+    val density = LocalDensity.current
 
     val coroutineScope = rememberCoroutineScope()
     var flingJob by remember { mutableStateOf<Job?>(null) }
@@ -412,6 +417,7 @@ fun CandlestickChartCompose(
                                         }
                                     } else {
                                         crosshairPosition = startPos
+                                        alertTap = startPos to yToPrice(startPos.y.coerceIn(0f, chartHeight))
                                         val clicked = drawings.reversed().firstOrNull { d -> isTouchNearDrawing(startPos, d) }
                                         onSelectDrawing(clicked?.id)
                                     }
@@ -780,6 +786,26 @@ fun CandlestickChartCompose(
                             strokeWidth = 1f,
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
                         )
+                    }
+                }
+            }
+
+            // Contextual alert plus: appears exactly where the user tapped on the chart.
+            alertTap?.let { (tapPosition, tapPrice) ->
+                Surface(
+                    onClick = { onChartAlertRequest(tapPrice); alertTap = null },
+                    shape = CircleShape,
+                    color = Color(0xFFFF9800),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (tapPosition.x - with(density) { 18.dp.toPx() }).roundToInt(),
+                            (tapPosition.y - with(density) { 18.dp.toPx() }).roundToInt()
+                        )
+                    }.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Add, contentDescription = "Create alert at ${formatMarketPrice(tapPrice)}", tint = Color.Black)
                     }
                 }
             }

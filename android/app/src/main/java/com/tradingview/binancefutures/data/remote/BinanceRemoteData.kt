@@ -59,49 +59,50 @@ class BinanceRemoteDataSource(
 
     suspend fun getFuturesTickers(): List<TradingPair> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
-                .url("$baseUrl/fapi/v1/ticker/24hr")
-                .build()
-
-            client.newCall(request).execute().use { response ->
+            // Discover the complete active USD-M perpetual universe from exchange metadata.
+            val exchangeRequest = Request.Builder().url("$baseUrl/fapi/v1/exchangeInfo").build()
+            val allowedSymbols = client.newCall(exchangeRequest).execute().use { response ->
                 if (!response.isSuccessful) return@withContext getFallbackTradingPairs()
                 val body = response.body?.string() ?: return@withContext getFallbackTradingPairs()
-                val jsonElement = com.google.gson.JsonParser.parseString(body)
-                if (!jsonElement.isJsonArray) return@withContext getFallbackTradingPairs()
+                val root = com.google.gson.JsonParser.parseString(body).asJsonObject
+                val symbols = root.getAsJsonArray("symbols") ?: return@withContext getFallbackTradingPairs()
+                symbols.mapNotNull { item ->
+                    if (!item.isJsonObject) return@mapNotNull null
+                    val obj = item.asJsonObject
+                    val symbol = obj.get("symbol")?.asString ?: return@mapNotNull null
+                    val status = obj.get("status")?.asString
+                    val contractType = obj.get("contractType")?.asString
+                    val quote = obj.get("quoteAsset")?.asString
+                    if (status == "TRADING" && contractType == "PERPETUAL" &&
+                        (quote == "USDT" || quote == "USDC")) symbol else null
+                }.toSet()
+            }
 
-                val array = jsonElement.asJsonArray
-                val list = mutableListOf<TradingPair>()
-                for (element in array) {
-                    if (!element.isJsonObject) continue
+            val tickerRequest = Request.Builder().url("$baseUrl/fapi/v1/ticker/24hr").build()
+            client.newCall(tickerRequest).execute().use { response ->
+                if (!response.isSuccessful) return@withContext getFallbackTradingPairs()
+                val body = response.body?.string() ?: return@withContext getFallbackTradingPairs()
+                val json = com.google.gson.JsonParser.parseString(body)
+                if (!json.isJsonArray) return@withContext getFallbackTradingPairs()
+                json.asJsonArray.mapNotNull { element ->
+                    if (!element.isJsonObject) return@mapNotNull null
                     val obj = element.asJsonObject
-                    val symbol = obj.get("symbol")?.asString ?: continue
-                    val isUsdt = symbol.endsWith("USDT")
-                    val isUsdc = symbol.endsWith("USDC")
-                    if (isUsdt || isUsdc) {
-                        val quote = if (isUsdt) "USDT" else "USDC"
-                        val base = symbol.removeSuffix(quote)
-                        val lastPrice = obj.get("lastPrice")?.asString?.toFloatOrNull() ?: 0f
-                        val priceChange = obj.get("priceChangePercent")?.asString?.toFloatOrNull() ?: 0f
-                        val highPrice = obj.get("highPrice")?.asString?.toFloatOrNull() ?: 0f
-                        val lowPrice = obj.get("lowPrice")?.asString?.toFloatOrNull() ?: 0f
-                        val volume = obj.get("volume")?.asString?.toFloatOrNull() ?: 0f
-                        val quoteVolume = obj.get("quoteVolume")?.asString?.toFloatOrNull() ?: 0f
-                        list.add(
-                            TradingPair(
-                                symbol = symbol,
-                                baseAsset = base,
-                                quoteAsset = quote,
-                                price = lastPrice,
-                                priceChangePercent = priceChange,
-                                highPrice = highPrice,
-                                lowPrice = lowPrice,
-                                volume = volume,
-                                quoteVolume = quoteVolume
-                            )
-                        )
-                    }
-                }
-                if (list.isNotEmpty()) list.sortedByDescending { it.quoteVolume } else getFallbackTradingPairs()
+                    val symbol = obj.get("symbol")?.asString ?: return@mapNotNull null
+                    if (symbol !in allowedSymbols) return@mapNotNull null
+                    val quote = if (symbol.endsWith("USDT")) "USDT" else "USDC"
+                    val base = symbol.removeSuffix(quote)
+                    TradingPair(
+                        symbol = symbol,
+                        baseAsset = base,
+                        quoteAsset = quote,
+                        price = obj.get("lastPrice")?.asString?.toFloatOrNull() ?: 0f,
+                        priceChangePercent = obj.get("priceChangePercent")?.asString?.toFloatOrNull() ?: 0f,
+                        highPrice = obj.get("highPrice")?.asString?.toFloatOrNull() ?: 0f,
+                        lowPrice = obj.get("lowPrice")?.asString?.toFloatOrNull() ?: 0f,
+                        volume = obj.get("volume")?.asString?.toFloatOrNull() ?: 0f,
+                        quoteVolume = obj.get("quoteVolume")?.asString?.toFloatOrNull() ?: 0f
+                    )
+                }.sortedByDescending { it.quoteVolume }.ifEmpty { getFallbackTradingPairs() }
             }
         } catch (e: Exception) {
             getFallbackTradingPairs()

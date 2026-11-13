@@ -191,6 +191,9 @@ class MainActivity : ComponentActivity() {
                                 onSelectTool = { viewModel.setActiveDrawingTool(it) },
                                 onClearAll = { viewModel.clearAllDrawings() },
                                 drawingsCount = uiState.drawings.size,
+                                drawings = uiState.drawings,
+                                onToggleLock = { viewModel.updateDrawing(it.copy(isLocked = !it.isLocked)) },
+                                onDeleteDrawing = { viewModel.deleteDrawing(it) },
                                 modifier = Modifier.align(Alignment.CenterStart)
                             )
 

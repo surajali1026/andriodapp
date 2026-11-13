@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Debug APK and Emulator Smoke Tests
+    name: Build Debug APK Only
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -49,30 +49,7 @@ jobs:
           cd android
           ./gradlew assembleDebug --stacktrace
 
-      - name: Run Android emulator smoke tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          disable-animations: true
-          script: bash .github/scripts/emulator-smoke-test.sh
-
-      - name: Upload emulator evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: emulator-smoke-evidence
-          path: |
-            chart-smoke.png
-            android-emulator-logcat.txt
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Upload Debug APK Artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk

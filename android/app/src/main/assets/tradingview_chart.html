@@ -4,12 +4,14 @@
 html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#0b0e11}
 #credit{position:absolute;left:8px;bottom:3px;color:#8b949e;font:10px Arial;opacity:.8;pointer-events:none}
 #error{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ff7777;font:13px Arial}
+#pricePlus{display:none;position:absolute;right:3px;z-index:20;width:28px;height:28px;border:0;border-radius:5px;background:#2962ff;color:#fff;font:bold 22px Arial;line-height:28px;padding:0;box-shadow:0 1px 5px #0008;touch-action:manipulation}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
-</head><body><div id="chart"></div><div id="credit">Charting library by TradingView</div><div id="error"></div>
+</head><body><div id="chart"></div><button id="pricePlus" aria-label="Create alert at this price">+</button><div id="credit">Charting library by TradingView</div><div id="error"></div>
 <script>
 (function(){
- const root=document.getElementById('chart'), error=document.getElementById('error');
+ const root=document.getElementById('chart'), error=document.getElementById('error'), plus=document.getElementById('pricePlus');
+ let selectedAlertPrice=null;
  if(!window.LightweightCharts){error.textContent='Chart library unavailable. Check internet connection.';return;}
  const chart=LightweightCharts.createChart(root,{
   width:root.clientWidth,height:root.clientHeight,
@@ -65,6 +67,29 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
   const key=s+'|'+tf+'|'+pt;
   if(key!==currentSeriesKey){currentSeriesKey=key;currentCount=0;currentFirst=null;currentLast=null;currentSymbol=s;}
  };
+ function positionPlus(y){
+  const price=series.coordinateToPrice(y);
+  if(price==null||!Number.isFinite(price)||price<=0){plus.style.display='none';return;}
+  selectedAlertPrice=price;
+  plus.style.top=Math.max(4,Math.min(root.clientHeight-32,y-14))+'px';
+  plus.style.display='block';
+ }
+ chart.subscribeCrosshairMove(param=>{
+  if(param&&param.point&&param.point.y>=0&&param.point.y<=root.clientHeight)positionPlus(param.point.y);
+  else plus.style.display='none';
+ });
+ root.addEventListener('pointerdown',event=>{
+  if(event.target===plus)return;
+  const rect=root.getBoundingClientRect();
+  const y=event.clientY-rect.top;
+  if(y>=0&&y<=root.clientHeight)positionPlus(y);
+ });
+ plus.addEventListener('click',event=>{
+  event.preventDefault();event.stopPropagation();
+  if(selectedAlertPrice&&window.AndroidAlert&&window.AndroidAlert.createAlertAtPrice){
+   window.AndroidAlert.createAlertAtPrice(selectedAlertPrice);
+  }
+ });
  new ResizeObserver(()=>chart.applyOptions({width:root.clientWidth,height:root.clientHeight})).observe(root);
  window.chartReady=true;
 })();

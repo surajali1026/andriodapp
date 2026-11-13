@@ -784,25 +784,29 @@ fun CandlestickChartCompose(
                 }
             }
 
-            // Top-Right Auto-Scale / Reset Button
+            // Top-Right Auto-Scale Button: restores automatic price fitting after manual axis zoom/pan.
+            val isAutoPriceScale = priceScaleMultiplier == 1f && pricePanOffset == 0f
             Surface(
                 onClick = {
                     priceScaleMultiplier = 1f
                     pricePanOffset = 0f
                 },
-                shape = RoundedCornerShape(4.dp),
-                color = TVCard.copy(alpha = 0.9f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, TVBorder),
+                shape = RoundedCornerShape(5.dp),
+                color = if (isAutoPriceScale) TVPrimaryBlue.copy(alpha = 0.16f) else TVCard.copy(alpha = 0.96f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isAutoPriceScale) TVPrimaryBlue.copy(alpha = 0.8f) else TVBorder
+                ),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 6.dp, end = 6.dp)
             ) {
                 Text(
-                    text = if (priceScaleMultiplier != 1f || pricePanOffset != 0f) "AUTO ●" else "AUTO",
-                    color = if (priceScaleMultiplier != 1f || pricePanOffset != 0f) TVPrimaryBlue else TVTextSecondary,
-                    fontSize = 9.sp,
+                    text = if (isAutoPriceScale) "AUTO ✓" else "RESET AUTO",
+                    color = if (isAutoPriceScale) TVPrimaryBlue else TVTextPrimary,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                 )
             }
 

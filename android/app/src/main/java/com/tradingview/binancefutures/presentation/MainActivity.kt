@@ -166,6 +166,10 @@ class MainActivity : ComponentActivity() {
                                 timeframe = uiState.timeframe.displayName,
                                 priceType = uiState.priceType.name,
                                 alerts = uiState.alerts.filter { it.symbol == uiState.symbol && it.isEnabled && !it.isTriggered },
+                                onPriceSelected = { price ->
+                                    alertDraftPrice = price
+                                    isAlertsOpen = true
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
 

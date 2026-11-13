@@ -694,22 +694,17 @@ fun CandlestickChartCompose(
                     }
                 }
 
-                // 3. Right-Side Price Scale Axis
+                // 3. Alert levels: clean dotted lines only, with no price/name tags.
                 val activeAlerts = alerts.filter { it.symbol == symbol && it.isEnabled && !it.isTriggered }
                 activeAlerts.forEach { alert ->
                     val alertY = priceToY(alert.targetPrice)
                     if (alertY in 0f..chartHeight) {
-                        val alertColor = Color(0xFFFF9800)
-                        drawRect(
-                            color = alertColor,
-                            topLeft = Offset(chartWidth, alertY - 11f),
-                            size = Size(140f, 22f)
-                        )
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = formatMarketPrice(alert.targetPrice),
-                            topLeft = Offset(chartWidth + 10f, alertY - 7f),
-                            style = TextStyle(color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        drawLine(
+                            color = Color(0xFFFF9800),
+                            start = Offset(0f, alertY),
+                            end = Offset(chartWidth, alertY),
+                            strokeWidth = 1.6f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f))
                         )
                     }
                 }

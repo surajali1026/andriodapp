@@ -6,7 +6,8 @@ data class Candle(
     val high: Float,
     val low: Float,
     val close: Float,
-    val volume: Float
+    val volume: Float,
+    val isClosed: Boolean = true
 )
 
 data class TradingPair(

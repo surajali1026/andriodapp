@@ -36,15 +36,6 @@ fun TradingViewLightweightChart(
     modifier: Modifier = Modifier
 ) {
     val gson = remember { Gson() }
-    val currentOnPriceSelected = rememberUpdatedState(onPriceSelected)
-    val currentPayload = rememberUpdatedState(payload)
-    val currentAlertPayload = rememberUpdatedState(alertPayload)
-    val currentSymbol = rememberUpdatedState(symbol)
-    val currentTimeframe = rememberUpdatedState(timeframe)
-    val currentPriceType = rememberUpdatedState(priceType)
-    val bridge = remember {
-        ChartAlertBridge { price -> currentOnPriceSelected.value(price) }
-    }
     val payload = gson.toJson(candles.takeLast(500).map {
         mapOf(
             "time" to it.time,
@@ -57,6 +48,16 @@ fun TradingViewLightweightChart(
     val alertPayload = gson.toJson(alerts.filter { it.isEnabled && !it.isTriggered }.map {
         mapOf("id" to it.id, "price" to it.targetPrice)
     })
+    val currentPayload = rememberUpdatedState(payload)
+    val currentAlertPayload = rememberUpdatedState(alertPayload)
+    val currentOnPriceSelected = rememberUpdatedState(onPriceSelected)
+    val currentSymbol = rememberUpdatedState(symbol)
+    val currentTimeframe = rememberUpdatedState(timeframe)
+    val currentPriceType = rememberUpdatedState(priceType)
+    val bridge = remember {
+        ChartAlertBridge { price -> currentOnPriceSelected.value(price) }
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { context ->

@@ -263,7 +263,7 @@ class ChartViewModel @JvmOverloads constructor(
                 wsJob = viewModelScope.launch {
                     while (isActive && requestId == loadRequestId) {
                         try {
-                            repository.getLiveCandleStream(symbol, tf)
+                            repository.getLiveCandleStream(symbol, tf, pType)
                                 .catch { error ->
                                     if (error is CancellationException) throw error
                                     if (requestId == loadRequestId) {

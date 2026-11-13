@@ -58,54 +58,7 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            set -euxo pipefail
-            adb devices
-            echo 'Waiting for Android emulator to finish booting...'
-            for i in $(seq 1 90); do
-              if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
-                break
-              fi
-              if [ "$i" -eq 90 ]; then
-                echo 'Emulator did not finish booting within 3 minutes'
-                adb logcat -d -t 300 || true
-                exit 1
-              fi
-              sleep 2
-            done
-            adb shell settings put global window_animation_scale 0
-            adb shell settings put global transition_animation_scale 0
-            adb shell settings put global animator_duration_scale 0
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb logcat -c
-            adb shell am force-stop com.tradingview.binancefutures || true
-            adb shell monkey -p com.tradingview.binancefutures -c android.intent.category.LAUNCHER 1
-            echo 'Waiting for app process...'
-            app_started=false
-            for i in $(seq 1 45); do
-              if adb shell pidof com.tradingview.binancefutures >/dev/null 2>&1; then
-                app_started=true
-                break
-              fi
-              sleep 2
-            done
-            if [ "$app_started" != "true" ]; then
-              echo 'App process did not start; collecting diagnostics'
-              adb shell dumpsys activity activities || true
-              adb logcat -d -v brief > android-emulator-logcat.txt
-              exit 1
-            fi
-            adb shell dumpsys activity activities | grep -F com.tradingview.binancefutures
-            sleep 10
-            adb logcat -d -v brief > android-emulator-logcat.txt
-            if grep -A 30 'FATAL EXCEPTION' android-emulator-logcat.txt | grep -F 'com.tradingview.binancefutures'; then
-              echo 'App crashed during emulator launch'
-              exit 1
-            fi
-            adb shell screencap -p /sdcard/chart-smoke.png
-            adb pull /sdcard/chart-smoke.png chart-smoke.png
-            test -s chart-smoke.png
-            echo 'Emulator launch smoke test passed'
+          script: bash .github/scripts/emulator-smoke-test.sh
 
       - name: Upload emulator evidence
         if: always()

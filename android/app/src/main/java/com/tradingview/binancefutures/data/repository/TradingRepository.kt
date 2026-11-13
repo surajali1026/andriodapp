@@ -13,7 +13,7 @@ interface TradingRepository {
         timeframe: Timeframe,
         priceType: com.tradingview.binancefutures.domain.model.PriceType = com.tradingview.binancefutures.domain.model.PriceType.LAST
     ): List<Candle>
-    fun getLiveCandleStream(symbol: String, timeframe: Timeframe): Flow<Candle>
+    fun getLiveCandleStream(symbol: String, timeframe: Timeframe, priceType: com.tradingview.binancefutures.domain.model.PriceType = com.tradingview.binancefutures.domain.model.PriceType.LAST): Flow<Candle>
     suspend fun getServerTime(): Long
 }
 
@@ -33,8 +33,8 @@ class TradingRepositoryImpl(
         priceType: com.tradingview.binancefutures.domain.model.PriceType
     ): List<Candle> = binance.getHistoricalKlines(symbol, timeframe, priceType)
 
-    override fun getLiveCandleStream(symbol: String, timeframe: Timeframe): Flow<Candle> =
-        binance.observeLiveKline(symbol, timeframe)
+    override fun getLiveCandleStream(symbol: String, timeframe: Timeframe, priceType: com.tradingview.binancefutures.domain.model.PriceType): Flow<Candle> =
+        binance.observeLiveKline(symbol, timeframe, priceType)
 
     override suspend fun getServerTime(): Long = binance.getServerTime()
 }

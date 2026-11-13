@@ -191,6 +191,8 @@ class MainActivity : ComponentActivity() {
                                     alertDraftPrice = price
                                     isAlertsOpen = true
                                 },
+                                onNextCoin = { viewModel.selectNextCoin() },
+                                onPreviousCoin = { viewModel.selectPreviousCoin() },
                                 modifier = Modifier.fillMaxSize()
                             )
 

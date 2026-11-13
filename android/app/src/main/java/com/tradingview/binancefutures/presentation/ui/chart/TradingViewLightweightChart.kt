@@ -67,10 +67,8 @@ fun TradingViewLightweightChart(
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
                 settings.loadsImagesAutomatically = true
-                // TradingView's hosted widget and market-data iframe must be reachable from this bundled local HTML page.
-                settings.allowFileAccessFromFileURLs = true
-                settings.allowUniversalAccessFromFileURLs = true
-                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                // The bundled lightweight chart loads its library over HTTPS.
+                // Keep local-file cross-origin access disabled; only the public CDN is needed.
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 addJavascriptInterface(bridge, "AndroidAlert")

@@ -31,6 +31,9 @@ jobs:
           fi
           chmod +x android/gradlew
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android NDK and CMake
         run: |
           yes | sdkmanager --licenses >/dev/null

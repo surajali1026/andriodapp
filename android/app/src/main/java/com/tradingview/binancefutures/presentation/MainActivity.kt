@@ -35,7 +35,7 @@ import com.tradingview.binancefutures.domain.model.AlertCondition
 import com.tradingview.binancefutures.domain.model.ConnectionStatus
 import com.tradingview.binancefutures.domain.model.Timeframe
 import com.tradingview.binancefutures.presentation.ui.alerts.AlertsDialogCompose
-import com.tradingview.binancefutures.presentation.ui.chart.CandlestickChartCompose
+import com.tradingview.binancefutures.presentation.ui.chart.TradingViewLightweightChart
 import com.tradingview.binancefutures.presentation.ui.drawing.DrawingToolbarCompose
 import com.tradingview.binancefutures.presentation.ui.header.TradingHeader
 import com.tradingview.binancefutures.presentation.ui.theme.*
@@ -157,26 +157,11 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxWidth()
                         ) {
                             // Candlestick Chart with alert dotted lines and swipe coin navigation
-                            CandlestickChartCompose(
+                            TradingViewLightweightChart(
                                 candles = uiState.candles,
-                                timeframe = uiState.timeframe,
                                 symbol = uiState.symbol,
-                                priceType = uiState.priceType,
-                                drawings = uiState.drawings,
-                                activeDrawingTool = uiState.activeDrawingTool,
-                                selectedDrawingId = uiState.selectedDrawingId,
-                                alerts = uiState.alerts,
-                                serverTimeOffset = uiState.serverTimeOffset,
-                                onSelectDrawing = { viewModel.selectDrawing(it) },
-                                onAddDrawing = { viewModel.addDrawing(it) },
-                                onUpdateDrawing = { viewModel.updateDrawing(it) },
-                                onDeleteDrawing = { viewModel.deleteDrawing(it) },
-                                onSwipeNextCoin = { viewModel.selectNextCoin() },
-                                onSwipePreviousCoin = { viewModel.selectPreviousCoin() },
-                                onChartAlertRequest = { price ->
-                                    alertDraftPrice = price
-                                    isAlertsOpen = true
-                                },
+                                timeframe = uiState.timeframe.displayName,
+                                priceType = uiState.priceType.name,
                                 modifier = Modifier.fillMaxSize()
                             )
 

@@ -184,14 +184,6 @@ fun TradingHeader(
                     )
                 }
 
-                // Quick-add alert button: opens the alert editor at the live price
-                IconButton(
-                    onClick = onOpenAlerts,
-                    modifier = Modifier.size(34.dp).background(Color(0xFFFF9800), RoundedCornerShape(8.dp))
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add price alert", tint = Color.Black, modifier = Modifier.size(21.dp))
-                }
-
                 // Alerts Dialog Trigger with active badge
                 IconButton(
                     onClick = onOpenAlerts,

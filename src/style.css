@@ -6,3 +6,5 @@
 .tf-wheel-btn{position:absolute;transform:translate(-50%,-50%);width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:#c5cbce;font-size:12px;font-weight:800}
 .tf-wheel-btn.active{background:#2962ff;color:white;box-shadow:0 0 12px #2962ff99}
 .tf-wheel-btn:active{background:#ffffff20}
+
+.auto-scale{border:1px solid #35414d!important;border-radius:4px!important;padding:7px 8px!important;font-size:10px!important;font-weight:800!important;letter-spacing:.3px}.auto-scale.active{color:#0ecb81!important;border-color:#0ecb81!important;background:#10251f!important}

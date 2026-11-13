@@ -32,6 +32,7 @@ fun AlertsDialogCompose(
     initialTargetPrice: Float? = null,
     alerts: List<PriceAlert>,
     onAddAlert: (Float, AlertCondition, Boolean, Boolean) -> Unit,
+    onTestSound: () -> Unit,
     onToggleAlert: (String) -> Unit,
     onDeleteAlert: (String) -> Unit
 ) {
@@ -89,7 +90,7 @@ fun AlertsDialogCompose(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Live: ${String.format(Locale.US, "%.2f", currentPrice)} USD",
+                                text = "Live: ${String.format(Locale.US, "%.2f", currentPrice)} USDT",
                                 color = TVBullishGreen,
                                 fontSize = 11.sp
                             )
@@ -103,7 +104,7 @@ fun AlertsDialogCompose(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Target Price Input
-                Text("Target Price (USD)", color = TVTextSecondary, fontSize = 11.sp)
+                Text("Target Price (USDT)", color = TVTextSecondary, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = targetPriceText,
@@ -219,7 +220,17 @@ fun AlertsDialogCompose(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                TextButton(
+                    onClick = onTestSound,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Test ringtone", color = Color(0xFFFF9800), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Button(
                     onClick = {

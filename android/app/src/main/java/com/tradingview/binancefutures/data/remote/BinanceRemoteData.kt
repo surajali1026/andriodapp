@@ -16,13 +16,22 @@ import java.util.concurrent.TimeUnit
 
 class BinanceRemoteDataSource(
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
         .pingInterval(15, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build(),
     private val gson: Gson = Gson()
 ) {
+    private val websocketClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+
     private val baseUrl = "https://fapi.binance.com"
     private val wsBaseUrl = "wss://fstream.binance.com/ws"
 
@@ -192,7 +201,7 @@ class BinanceRemoteDataSource(
         val stream = "${symbol.lowercase()}@kline_$interval"
         val request = Request.Builder().url("$wsBaseUrl/$stream").build()
 
-        val webSocket = client.newWebSocket(request, object : WebSocketListener() {
+        val webSocket = websocketClient.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
                     val root = gson.fromJson(text, com.google.gson.JsonObject::class.java)
@@ -204,7 +213,8 @@ class BinanceRemoteDataSource(
                             high = k.get("h").asFloat,
                             low = k.get("l").asFloat,
                             close = k.get("c").asFloat,
-                            volume = k.get("v").asFloat
+                            volume = k.get("v").asFloat,
+                            isClosed = k.get("x")?.asBoolean ?: false
                         )
                         trySend(candle)
                     }

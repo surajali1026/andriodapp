@@ -41,6 +41,7 @@ import com.tradingview.binancefutures.presentation.ui.header.TradingHeader
 import com.tradingview.binancefutures.presentation.ui.theme.*
 import com.tradingview.binancefutures.presentation.ui.timeframe.CustomTimeframeDialog
 import com.tradingview.binancefutures.presentation.ui.watchlist.WatchlistDialogCompose
+import com.tradingview.binancefutures.presentation.ui.watchlist.WatchlistScreen
 import com.tradingview.binancefutures.presentation.viewmodel.ChartViewModel
 
 class MainActivity : ComponentActivity() {
@@ -111,6 +112,7 @@ class MainActivity : ComponentActivity() {
                 var isCustomTfOpen by remember { mutableStateOf(false) }
                 var isFullScreen by remember { mutableStateOf(false) }
                 var alertDraftPrice by remember { mutableFloatStateOf(0f) }
+                var selectedMainTab by remember { mutableStateOf("CHART") }
 
                 LaunchedEffect(isFullScreen) {
                     val bars = WindowInsetsControllerCompat(window, window.decorView)
@@ -131,6 +133,16 @@ class MainActivity : ComponentActivity() {
                     color = TVBackground
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
+                        if (selectedMainTab == "WATCHLIST") {
+                            WatchlistScreen(
+                                pairs = uiState.pairs,
+                                currentSymbol = uiState.symbol,
+                                favorites = uiState.favorites,
+                                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                onSelectSymbol = { viewModel.selectSymbol(it); selectedMainTab = "CHART" },
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
                         // 1. Top Header (Hidden in Full-Screen mode to maximize chart space)
                         if (!isFullScreen) {
                             TradingHeader(
@@ -140,7 +152,7 @@ class MainActivity : ComponentActivity() {
                                 priceType = uiState.priceType,
                                 alertsCount = uiState.alerts.filter { it.symbol == uiState.symbol && it.isEnabled && !it.isTriggered }.size,
                                 isFullScreen = false,
-                                onOpenWatchlist = { isWatchlistOpen = true },
+                                onOpenWatchlist = { selectedMainTab = "WATCHLIST" },
                                 onSelectTimeframe = { viewModel.selectTimeframe(it) },
                                 onOpenCustomTimeframe = { isCustomTfOpen = true },
                                 onSelectPriceType = { viewModel.setPriceType(it) },
@@ -302,6 +314,28 @@ class MainActivity : ComponentActivity() {
                                     color = TVTextSecondary,
                                     fontSize = 10.sp
                                 )
+                            }
+                        }
+                        }
+                    }
+
+                    if (!isFullScreen) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().background(TVSurface).navigationBarsPadding().padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(onClick = { selectedMainTab = "WATCHLIST" }, color = if (selectedMainTab == "WATCHLIST") TVPrimaryBlue.copy(alpha = 0.18f) else Color.Transparent, shape = RoundedCornerShape(10.dp)) {
+                                Column(Modifier.padding(horizontal = 34.dp, vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.Star, contentDescription = "Watchlist", tint = if (selectedMainTab == "WATCHLIST") TVPrimaryBlue else TVTextSecondary)
+                                    Text("Watchlist", color = if (selectedMainTab == "WATCHLIST") Color.White else TVTextSecondary, fontSize = 10.sp)
+                                }
+                            }
+                            Surface(onClick = { selectedMainTab = "CHART" }, color = if (selectedMainTab == "CHART") TVPrimaryBlue.copy(alpha = 0.18f) else Color.Transparent, shape = RoundedCornerShape(10.dp)) {
+                                Column(Modifier.padding(horizontal = 34.dp, vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.ShowChart, contentDescription = "Chart", tint = if (selectedMainTab == "CHART") TVPrimaryBlue else TVTextSecondary)
+                                    Text("Chart", color = if (selectedMainTab == "CHART") Color.White else TVTextSecondary, fontSize = 10.sp)
+                                }
                             }
                         }
                     }

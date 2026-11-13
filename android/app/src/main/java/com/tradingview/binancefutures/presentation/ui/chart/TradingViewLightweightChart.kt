@@ -1,17 +1,27 @@
 package com.tradingview.binancefutures.presentation.ui.chart
 
 import android.graphics.Color as AndroidColor
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.gson.Gson
 import com.tradingview.binancefutures.domain.model.Candle
 import com.tradingview.binancefutures.domain.model.PriceAlert
-import kotlinx.coroutines.delay
+
+private class ChartAlertBridge(private val onPriceSelected: (Float) -> Unit) {
+    @JavascriptInterface
+    fun createAlertAtPrice(price: Double) {
+        if (price.isFinite() && price > 0.0 && price <= Float.MAX_VALUE) {
+            onPriceSelected(price.toFloat())
+        }
+    }
+}
 
 @Composable
 fun TradingViewLightweightChart(
@@ -20,9 +30,14 @@ fun TradingViewLightweightChart(
     timeframe: String,
     priceType: String,
     alerts: List<PriceAlert> = emptyList(),
+    onPriceSelected: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val gson = Gson()
+    val gson = remember { Gson() }
+    val currentOnPriceSelected = rememberUpdatedState(onPriceSelected)
+    val bridge = remember {
+        ChartAlertBridge { price -> currentOnPriceSelected.value(price) }
+    }
     val payload = gson.toJson(candles.takeLast(500).map {
         mapOf(
             "time" to it.time,
@@ -32,7 +47,9 @@ fun TradingViewLightweightChart(
             "close" to it.close
         )
     })
-    val alertPayload = gson.toJson(alerts.filter { it.isEnabled && !it.isTriggered }.map { mapOf("id" to it.id, "price" to it.targetPrice) })
+    val alertPayload = gson.toJson(alerts.filter { it.isEnabled && !it.isTriggered }.map {
+        mapOf("id" to it.id, "price" to it.targetPrice)
+    })
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -44,12 +61,16 @@ fun TradingViewLightweightChart(
                 settings.loadsImagesAutomatically = false
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
+                addJavascriptInterface(bridge, "AndroidAlert")
                 webChromeClient = WebChromeClient()
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
                         view.evaluateJavascript("window.setSymbolInfo && window.setSymbolInfo('$symbol','$timeframe','$priceType');", null)
-                        view.evaluateJavascript("window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');window.setAlerts && window.setAlerts($alertPayload);", null)
+                        view.evaluateJavascript(
+                            "window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');window.setAlerts && window.setAlerts($alertPayload);",
+                            null
+                        )
                     }
                 }
                 loadUrl("file:///android_asset/tradingview_chart.html")

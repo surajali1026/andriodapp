@@ -31,6 +31,9 @@ alertButton.addEventListener('pointerdown',function(e){dragStart={x:e.clientX,y:
 alertButton.addEventListener('pointermove',function(e){if(!dragStart)return;const dx=e.clientX-dragStart.x,dy=e.clientY-dragStart.y;if(Math.abs(dx)+Math.abs(dy)>6)dragMoved=true;if(dragMoved){const x=Math.max(4,Math.min(window.innerWidth-48,dragStart.left+dx));const y=Math.max(8,Math.min(window.innerHeight-56,dragStart.top+dy));alertButton.style.left=x+'px';alertButton.style.top=y+'px';alertButton.style.right='auto';}});
 alertButton.addEventListener('pointerup',function(){dragStart=null;});
 alertButton.addEventListener('click',function(e){if(dragMoved){e.preventDefault();dragMoved=false;return;}if(lastClose>0&&window.AndroidAlert&&window.AndroidAlert.createAlertAtPrice){window.AndroidAlert.createAlertAtPrice(lastClose);}});
+let axisSwipeStart=null;
+host.addEventListener('touchstart',function(e){if(e.touches.length!==1)return;const t=e.touches[0];const rect=host.getBoundingClientRect();const y=t.clientY-rect.top;axisSwipeStart={x:t.clientX,y:t.clientY,eligible:(y>rect.height-72||t.clientX<22||t.clientX>window.innerWidth-22)};},{passive:true});
+host.addEventListener('touchend',function(e){if(!axisSwipeStart||!axisSwipeStart.eligible)return;const t=e.changedTouches[0];const dx=t.clientX-axisSwipeStart.x;const dy=t.clientY-axisSwipeStart.y;if(Math.abs(dx)>85&&Math.abs(dx)>Math.abs(dy)*1.35&&window.AndroidAlert&&window.AndroidAlert.navigateCoin){window.AndroidAlert.navigateCoin(dx<0?'next':'previous');}axisSwipeStart=null;},{passive:true});
 window.setAlerts=function(items){pendingAlerts=items||[];if(!series)return;alertLines.forEach(line=>series.removePriceLine(line));alertLines=[];(items||[]).forEach(a=>{const p=Number(a.price);if(Number.isFinite(p)&&p>0)alertLines.push(series.createPriceLine({price:p,color:'#f5a623',lineWidth:1,lineStyle:2,axisLabelVisible:true}));});};
 window.addEventListener('load',init);
 })();

@@ -94,3 +94,33 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+
+val lightweightChartsAsset = layout.projectDirectory.file("src/main/assets/lightweight-charts.standalone.production.js")
+val downloadLightweightCharts by tasks.registering {
+    description = "Bundle TradingView Lightweight Charts 4.2.2 for offline chart rendering"
+    outputs.file(lightweightChartsAsset)
+    doLast {
+        val output = lightweightChartsAsset.asFile
+        if (!output.exists() || output.length() < 100_000) {
+            output.parentFile.mkdirs()
+            val url = java.net.URI(
+                "https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"
+            ).toURL()
+            val connection = url.openConnection().apply {
+                connectTimeout = 30000
+                readTimeout = 60000
+            }
+            val temp = java.io.File(output.parentFile, output.name + ".tmp")
+            connection.getInputStream().use { input ->
+                temp.outputStream().use { out -> input.copyTo(out) }
+            }
+            check(temp.length() > 100_000) { "TradingView library download incomplete" }
+            java.nio.file.Files.move(
+                temp.toPath(), output.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(downloadLightweightCharts) }

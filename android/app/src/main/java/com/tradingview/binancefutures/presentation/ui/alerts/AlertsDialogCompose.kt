@@ -38,7 +38,7 @@ fun AlertsDialogCompose(
 ) {
     if (!isOpen) return
 
-    var targetPriceText by remember(isOpen, initialTargetPrice, currentPrice) {
+    var targetPriceText by remember(isOpen, initialTargetPrice) {
         val price = initialTargetPrice ?: currentPrice
         mutableStateOf(if (price > 0f) String.format(Locale.US, "%.8f", price).trimEnd('0').trimEnd('.') else "")
     }

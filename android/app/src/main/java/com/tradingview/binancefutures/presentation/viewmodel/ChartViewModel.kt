@@ -192,47 +192,92 @@ class ChartViewModel @JvmOverloads constructor(
     }
 
     private fun loadCandles(symbol: String, tf: Timeframe, pType: PriceType = _uiState.value.priceType) {
-        loadRequestId += 1L
-        val requestId = loadRequestId
+        // A symbol/timeframe change invalidates every previous network stream immediately.
+        val requestId = ++loadRequestId
         loadJob?.cancel()
         wsJob?.cancel()
         pollJob?.cancel()
+        previousPrice = null
+        _uiState.value = _uiState.value.copy(
+            candles = emptyList(),
+            isLoading = true,
+            connectionStatus = ConnectionStatus.CONNECTING,
+            errorMessage = null
+        )
+
+        // Historical HTTP work, live WebSocket, and fallback polling are siblings.
+        // This prevents a completed HTTP parent job from owning long-lived child jobs.
         loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, connectionStatus = ConnectionStatus.CONNECTING, errorMessage = null)
             try {
-                val history = repository.getHistoricalCandles(symbol, tf, pType)
+                val rawHistory = repository.getHistoricalCandles(symbol, tf, pType)
+                if (!isActive || requestId != loadRequestId || _uiState.value.symbol != symbol) return@launch
+
+                // Reject malformed/out-of-range OHLC rows and cap UI work on low-memory phones.
+                val history = rawHistory.asSequence()
+                    .filter { candle ->
+                        candle.time > 0L &&
+                        candle.open.isFinite() && candle.high.isFinite() &&
+                        candle.low.isFinite() && candle.close.isFinite() &&
+                        candle.open > 0f && candle.high > 0f &&
+                        candle.low > 0f && candle.close > 0f &&
+                        candle.high >= maxOf(candle.open, candle.close, candle.low) &&
+                        candle.low <= minOf(candle.open, candle.close, candle.high)
+                    }
+                    .sortedBy { it.time }
+                    .distinctBy { it.time }
+                    .toList()
+                    .takeLast(300)
+
                 if (!isActive || requestId != loadRequestId) return@launch
-                _uiState.value = _uiState.value.copy(candles = history, isLoading = false, connectionStatus = if (history.isEmpty()) ConnectionStatus.RECONNECTING else ConnectionStatus.CONNECTED)
                 previousPrice = history.lastOrNull()?.close
-                wsJob = launch {
+                _uiState.value = _uiState.value.copy(
+                    candles = history,
+                    isLoading = false,
+                    connectionStatus = if (history.isEmpty()) ConnectionStatus.RECONNECTING else ConnectionStatus.CONNECTED
+                )
+
+                wsJob = viewModelScope.launch {
                     while (isActive && requestId == loadRequestId) {
                         try {
                             repository.getLiveCandleStream(symbol, tf)
                                 .catch { error ->
                                     if (error is CancellationException) throw error
-                                    if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                                    if (requestId == loadRequestId) {
+                                        _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                                    }
                                 }
-                                .collect { updatedCandle ->
-                                    if (isActive && requestId == loadRequestId && _uiState.value.symbol == symbol && _uiState.value.timeframe == tf && _uiState.value.priceType == pType) {
+                                .collect { candle ->
+                                    if (isActive && requestId == loadRequestId &&
+                                        _uiState.value.symbol == symbol &&
+                                        _uiState.value.timeframe == tf &&
+                                        _uiState.value.priceType == pType
+                                    ) {
                                         _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.CONNECTED)
-                                        handleCandleUpdate(updatedCandle)
+                                        handleCandleUpdate(candle)
                                     }
                                 }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
-                            if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                            if (requestId == loadRequestId) {
+                                _uiState.value = _uiState.value.copy(connectionStatus = ConnectionStatus.RECONNECTING)
+                            }
                         }
                         delay(2500L)
                     }
                 }
-                pollJob = launch {
+
+                pollJob = viewModelScope.launch {
                     while (isActive && requestId == loadRequestId) {
                         delay(10_000L)
                         try {
                             if (_uiState.value.connectionStatus != ConnectionStatus.CONNECTED) {
                                 val latest = repository.getHistoricalCandles(symbol, tf, pType)
-                                if (isActive && requestId == loadRequestId && _uiState.value.symbol == symbol && _uiState.value.timeframe == tf && _uiState.value.priceType == pType) {
+                                if (isActive && requestId == loadRequestId &&
+                                    _uiState.value.symbol == symbol &&
+                                    _uiState.value.timeframe == tf &&
+                                    _uiState.value.priceType == pType
+                                ) {
                                     latest.lastOrNull()?.let { handleCandleUpdate(it) }
                                 }
                             }
@@ -244,21 +289,34 @@ class ChartViewModel @JvmOverloads constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (requestId == loadRequestId) _uiState.value = _uiState.value.copy(isLoading = false, connectionStatus = ConnectionStatus.ERROR, errorMessage = error.message)
+                if (requestId == loadRequestId) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        connectionStatus = ConnectionStatus.ERROR,
+                        errorMessage = error.message
+                    )
+                }
             }
         }
     }
 
     private fun handleCandleUpdate(updatedCandle: Candle) {
-        val currentCandles = _uiState.value.candles.toMutableList()
-        if (currentCandles.isNotEmpty() && currentCandles.last().time == updatedCandle.time) {
-            currentCandles[currentCandles.size - 1] = updatedCandle
-        } else if (currentCandles.isNotEmpty() && updatedCandle.time > currentCandles.last().time) {
-            currentCandles.add(updatedCandle)
-        } else if (currentCandles.isEmpty()) {
-            currentCandles.add(updatedCandle)
+        if (!updatedCandle.open.isFinite() || !updatedCandle.high.isFinite() ||
+            !updatedCandle.low.isFinite() || !updatedCandle.close.isFinite() ||
+            updatedCandle.open <= 0f || updatedCandle.high <= 0f ||
+            updatedCandle.low <= 0f || updatedCandle.close <= 0f
+        ) return
+
+        val current = _uiState.value.candles
+        val next = when {
+            current.isNotEmpty() && current.last().time == updatedCandle.time ->
+                current.dropLast(1) + updatedCandle
+            current.isNotEmpty() && updatedCandle.time > current.last().time ->
+                (current + updatedCandle).takeLast(300)
+            current.isEmpty() -> listOf(updatedCandle)
+            else -> return
         }
-        _uiState.value = _uiState.value.copy(candles = currentCandles)
+        _uiState.value = _uiState.value.copy(candles = next)
         checkAlerts(updatedCandle)
     }
 

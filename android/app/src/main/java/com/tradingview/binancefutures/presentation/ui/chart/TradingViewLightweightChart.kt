@@ -46,7 +46,7 @@ fun TradingViewLightweightChart(
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
                         view.evaluateJavascript("window.setSymbolInfo && window.setSymbolInfo('$symbol','$timeframe','$priceType');", null)
-                        view.evaluateJavascript("window.setCandles && window.setCandles($payload);", null)
+                        view.evaluateJavascript("window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');", null)
                     }
                 }
                 loadUrl("file:///android_asset/tradingview_chart.html")
@@ -57,7 +57,7 @@ fun TradingViewLightweightChart(
             val safeTimeframe = timeframe.replace("'", "")
             val safePriceType = priceType.replace("'", "")
             webView.evaluateJavascript(
-                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');window.setCandles && window.setCandles($payload);",
+                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');window.setCandles && window.setCandles($payload,'$safeSymbol');",
                 null
             )
         }

@@ -16,7 +16,18 @@ import com.google.gson.Gson
 import com.tradingview.binancefutures.domain.model.Candle
 import com.tradingview.binancefutures.domain.model.PriceAlert
 
-private class ChartAlertBridge(private val onPriceSelected: (Float) -> Unit) {
+private class ChartAlertBridge(
+    private val onPriceSelected: (Float) -> Unit,
+    private val onNextCoin: () -> Unit,
+    private val onPreviousCoin: () -> Unit
+) {
+    @JavascriptInterface
+    fun navigateCoin(direction: String) {
+        Handler(Looper.getMainLooper()).post {
+            if (direction == "next") onNextCoin() else if (direction == "previous") onPreviousCoin()
+        }
+    }
+
     @JavascriptInterface
     fun createAlertAtPrice(price: Double) {
         if (price.isFinite() && price > 0.0 && price <= Float.MAX_VALUE) {
@@ -33,6 +44,8 @@ fun TradingViewLightweightChart(
     priceType: String,
     alerts: List<PriceAlert> = emptyList(),
     onPriceSelected: (Float) -> Unit = {},
+    onNextCoin: () -> Unit = {},
+    onPreviousCoin: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val gson = remember { Gson() }
@@ -51,11 +64,17 @@ fun TradingViewLightweightChart(
     val currentPayload = rememberUpdatedState(payload)
     val currentAlertPayload = rememberUpdatedState(alertPayload)
     val currentOnPriceSelected = rememberUpdatedState(onPriceSelected)
+    val currentOnNextCoin = rememberUpdatedState(onNextCoin)
+    val currentOnPreviousCoin = rememberUpdatedState(onPreviousCoin)
     val currentSymbol = rememberUpdatedState(symbol)
     val currentTimeframe = rememberUpdatedState(timeframe)
     val currentPriceType = rememberUpdatedState(priceType)
     val bridge = remember {
-        ChartAlertBridge { price -> currentOnPriceSelected.value(price) }
+        ChartAlertBridge(
+            onPriceSelected = { price -> currentOnPriceSelected.value(price) },
+            onNextCoin = { currentOnNextCoin.value() },
+            onPreviousCoin = { currentOnPreviousCoin.value() }
+        )
     }
 
     AndroidView(

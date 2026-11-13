@@ -33,11 +33,15 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          packages: ''
 
       - name: Install Android NDK and CMake
         run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "platform-tools" "platforms;android-35" "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Build Debug APK with Gradle
         run: |

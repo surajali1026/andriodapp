@@ -229,7 +229,7 @@ fun WatchlistDialogCompose(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = " USDT",
+                                            text = " ${pair.quoteAsset}",
                                             color = TVTextSecondary,
                                             fontSize = 10.sp
                                         )

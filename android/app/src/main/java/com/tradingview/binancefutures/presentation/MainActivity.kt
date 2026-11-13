@@ -331,7 +331,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         }
-                    }
 
 
 
@@ -354,6 +353,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+
                     }
 
                     // 1-Click Slide-Out Watchlist Drawer

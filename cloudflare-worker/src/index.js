@@ -20,6 +20,19 @@ export default {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204 });
 
+    if (url.pathname === "/api/device/register" && request.method === "POST") {
+      if (!env.ALERTS_DB) return json({ ok: false, error: "D1 database is not connected." }, 503);
+      let body;
+      try { body = await request.json(); } catch { return json({ ok: false, error: "Invalid JSON body." }, 400); }
+      const token = String(body.token || "");
+      const platform = String(body.platform || "android").slice(0, 20);
+      if (token.length < 40 || token.length > 4096) return json({ ok: false, error: "Invalid FCM token." }, 400);
+      await env.ALERTS_DB.prepare(
+        "INSERT INTO devices (id, fcm_token, platform, updated_at) VALUES ('primary', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET fcm_token = excluded.fcm_token, platform = excluded.platform, updated_at = excluded.updated_at"
+      ).bind(token, platform, new Date().toISOString()).run();
+      return json({ ok: true, registered: true });
+    }
+
     if (url.pathname === "/health" || url.pathname === "/") {
       return json({
         ok: true,

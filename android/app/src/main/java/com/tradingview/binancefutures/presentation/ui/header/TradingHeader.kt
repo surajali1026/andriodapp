@@ -28,6 +28,7 @@ fun TradingHeader(
     currentPair: TradingPair?,
     timeframe: Timeframe,
     priceType: PriceType,
+    favoriteTimeframes: List<Timeframe> = listOf(Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1),
     alertsCount: Int,
     isFullScreen: Boolean,
     onOpenWatchlist: () -> Unit,
@@ -242,13 +243,7 @@ fun TradingHeader(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val commonTfs = listOf(
-                    Timeframe.M1, Timeframe.M3, Timeframe.M5,
-                    Timeframe.M15, Timeframe.M30, Timeframe.H1,
-                    Timeframe.H2, Timeframe.H4, Timeframe.H6,
-                    Timeframe.H8, Timeframe.H12, Timeframe.D1,
-                    Timeframe.D3, Timeframe.W1, Timeframe.MO1
-                )
+                val commonTfs = favoriteTimeframes
 
                 commonTfs.forEach { tf ->
                     val isSelected = tf == timeframe

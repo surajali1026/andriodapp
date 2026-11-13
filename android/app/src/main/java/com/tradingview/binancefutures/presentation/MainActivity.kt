@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
                 var isAlertsOpen by remember { mutableStateOf(false) }
                 var isCustomTfOpen by remember { mutableStateOf(false) }
                 var isFullScreen by remember { mutableStateOf(false) }
+                var alertDraftPrice by remember { mutableFloatStateOf(0f) }
 
                 LaunchedEffect(isFullScreen) {
                     val bars = WindowInsetsControllerCompat(window, window.decorView)
@@ -130,6 +131,10 @@ class MainActivity : ComponentActivity() {
                                 onDeleteDrawing = { viewModel.deleteDrawing(it) },
                                 onSwipeNextCoin = { viewModel.selectNextCoin() },
                                 onSwipePreviousCoin = { viewModel.selectPreviousCoin() },
+                                onChartAlertRequest = { price ->
+                                    alertDraftPrice = price
+                                    isAlertsOpen = true
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
 
@@ -234,41 +239,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Fixed Alert Plus Button at Bottom Right
-                            Surface(
-                                onClick = {
-                                    if (uiState.candles.isNotEmpty()) {
-                                        val p = uiState.candles.last().close
-                                        viewModel.addAlert(uiState.symbol, p, AlertCondition.CROSSES_ABOVE)
-                                        viewModel.triggerDeviceVibration(this@MainActivity)
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFFF9800),
-                                shadowElevation = 6.dp,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 65.dp, bottom = 36.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Add Alert",
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "Alert",
-                                        color = Color.Black,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
                         }
 
                         // 3. Bottom Status Strip (Hidden in Full-Screen)
@@ -318,6 +288,7 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { isAlertsOpen = false },
                         symbol = uiState.symbol,
                         currentPrice = uiState.candles.lastOrNull()?.close ?: 0f,
+                        initialTargetPrice = alertDraftPrice.takeIf { it > 0f },
                         alerts = uiState.alerts.filter { it.symbol == uiState.symbol },
                         onAddAlert = { price, cond, sound, vibrate ->
                             viewModel.addAlert(uiState.symbol, price, cond, sound, vibrate)

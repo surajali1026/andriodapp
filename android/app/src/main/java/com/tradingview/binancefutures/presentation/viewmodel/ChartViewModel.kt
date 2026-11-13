@@ -61,13 +61,14 @@ class ChartViewModel @JvmOverloads constructor(
     private var wsJob: Job? = null
     private var pollJob: Job? = null
     private var serverTimeJob: Job? = null
+    private var pairsRefreshJob: Job? = null
     private var previousPrice: Float? = null
     private var loadRequestId: Long = 0L
     private var activeAlertRingtone: Ringtone? = null
 
     init {
         loadSavedFavoritesAndAlerts()
-        loadTradingPairs()
+        refreshTradingPairsPeriodically()
         syncServerTime()
         loadCandles("BTCUSDT", Timeframe.M1)
     }
@@ -133,9 +134,32 @@ class ChartViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             try {
                 val pairs = repository.getFuturesTradingPairs()
-                _uiState.value = _uiState.value.copy(pairs = pairs)
+                if (pairs.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(pairs = pairs)
+                }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = e.message)
+                if (e !is CancellationException) {
+                    _uiState.value = _uiState.value.copy(errorMessage = e.message)
+                }
+            }
+        }
+    }
+
+    // Binance USD-M listings change over time; refresh the exchange metadata regularly.
+    private fun refreshTradingPairsPeriodically() {
+        pairsRefreshJob?.cancel()
+        pairsRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                try {
+                    val pairs = repository.getFuturesTradingPairs()
+                    if (pairs.isNotEmpty()) {
+                        _uiState.value = _uiState.value.copy(pairs = pairs)
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    // Keep the last successful market list while the network is unavailable.
+                }
+                delay(15 * 60 * 1000L)
             }
         }
     }

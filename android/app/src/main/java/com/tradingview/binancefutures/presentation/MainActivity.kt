@@ -333,6 +333,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+
+
                     if (!isFullScreen) {
                         Row(
                             modifier = Modifier.fillMaxWidth().background(TVSurface).navigationBarsPadding().padding(vertical = 6.dp),

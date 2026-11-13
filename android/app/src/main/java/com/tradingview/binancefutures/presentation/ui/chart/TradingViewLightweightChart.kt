@@ -78,16 +78,26 @@ fun TradingViewLightweightChart(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
-                        // The embedded TradingView widget owns its own live candle feed.
-                        // Do not inject legacy Binance candle payloads into this chart.
+                        val safeSymbol = currentSymbol.value.replace("'", "")
+                        view.evaluateJavascript(
+                            "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','" + currentTimeframe.value + "');" +
+                                "window.setCandles && window.setCandles(${currentPayload.value});" +
+                                "window.setAlerts && window.setAlerts(${currentAlertPayload.value});",
+                            null
+                        )
                     }
                 }
                 loadUrl("file:///android_asset/tradingview_chart.html")
             }
         },
         update = { webView ->
-            // TradingView's built-in symbol and timeframe controls manage the chart.
-            // The old Lightweight Charts bridge expected setCandles(), which this widget does not expose.
+            val safeSymbol = symbol.replace("'", "")
+            webView.evaluateJavascript(
+                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$timeframe');" +
+                    "window.setCandles && window.setCandles($payload);" +
+                    "window.setAlerts && window.setAlerts($alertPayload);",
+                null
+            )
         }
     )
 }

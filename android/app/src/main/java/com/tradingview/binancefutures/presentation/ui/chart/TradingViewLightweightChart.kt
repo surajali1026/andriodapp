@@ -1,6 +1,8 @@
 package com.tradingview.binancefutures.presentation.ui.chart
 
 import android.graphics.Color as AndroidColor
+import android.os.Handler
+import android.os.Looper
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -18,7 +20,7 @@ private class ChartAlertBridge(private val onPriceSelected: (Float) -> Unit) {
     @JavascriptInterface
     fun createAlertAtPrice(price: Double) {
         if (price.isFinite() && price > 0.0 && price <= Float.MAX_VALUE) {
-            onPriceSelected(price.toFloat())
+            Handler(Looper.getMainLooper()).post { onPriceSelected(price.toFloat()) }
         }
     }
 }

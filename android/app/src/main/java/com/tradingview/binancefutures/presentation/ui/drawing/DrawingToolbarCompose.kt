@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tradingview.binancefutures.domain.model.DrawingType
+import com.tradingview.binancefutures.domain.model.Drawing
 import com.tradingview.binancefutures.presentation.ui.theme.*
 
 @Composable
@@ -23,9 +24,13 @@ fun DrawingToolbarCompose(
     onSelectTool: (DrawingType?) -> Unit,
     onClearAll: () -> Unit,
     drawingsCount: Int,
+    drawings: List<Drawing> = emptyList(),
+    onToggleLock: (Drawing) -> Unit = {},
+    onDeleteDrawing: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    var showDrawingManager by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier.fillMaxHeight(),
@@ -122,6 +127,9 @@ fun DrawingToolbarCompose(
                     }
 
                     if (drawingsCount > 0) {
+                        IconButton(onClick = { showDrawingManager = true }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Manage drawings", tint = TVPrimaryBlue)
+                        }
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(
                             onClick = onClearAll,
@@ -157,5 +165,37 @@ fun DrawingToolbarCompose(
                 )
             }
         }
+    }
+
+    if (showDrawingManager) {
+        AlertDialog(
+            onDismissRequest = { showDrawingManager = false },
+            containerColor = TVSurface,
+            title = { Text("Drawings", color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    drawings.forEach { drawing ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(drawing.type.name.replace("_", " "), color = Color.White)
+                                Text(if (drawing.isLocked) "Locked" else "Editable", color = TVTextSecondary, style = MaterialTheme.typography.labelSmall)
+                            }
+                            IconButton(onClick = { onToggleLock(drawing) }) {
+                                Icon(if (drawing.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = "Lock or unlock", tint = TVPrimaryBlue)
+                            }
+                            IconButton(onClick = { onDeleteDrawing(drawing.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete drawing", tint = TVBearishRed)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDrawingManager = false }) { Text("Done", color = TVPrimaryBlue) } }
+        )
     }
 }

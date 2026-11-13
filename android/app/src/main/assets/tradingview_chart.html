@@ -47,7 +47,8 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
     const sameSeries=nextSymbol===currentSymbol && first===currentFirst;
     if(!sameSeries || currentCount===0 || count<currentCount || count>currentCount+1){series.setData(data);if(!sameSeries||currentCount===0)chart.timeScale().fitContent();}
     else{series.update(data[data.length-1]);}
-    currentSymbol=nextSymbol;currentFirst=first;currentLast=last;currentCount=count;error.textContent='';\n    console.info('Chart candles rendered:',count,'symbol:',currentSymbol,'first:',first,'last:',last);
+    currentSymbol=nextSymbol;currentFirst=first;currentLast=last;currentCount=count;error.textContent='';
+    console.info('Chart candles rendered:',count,'symbol:',currentSymbol,'first:',first,'last:',last);
    }
   }catch(e){error.textContent='Unable to render candles';}
  };

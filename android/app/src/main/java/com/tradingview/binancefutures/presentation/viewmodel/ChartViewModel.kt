@@ -2,8 +2,8 @@ package com.tradingview.binancefutures.presentation.viewmodel
 
 import android.app.Application
 import android.content.Context
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
@@ -61,6 +61,7 @@ class ChartViewModel @JvmOverloads constructor(
     private var pollJob: Job? = null
     private var serverTimeJob: Job? = null
     private var previousPrice: Float? = null
+    private var activeAlertRingtone: Ringtone? = null
 
     init {
         loadSavedFavoritesAndAlerts()
@@ -356,8 +357,8 @@ class ChartViewModel @JvmOverloads constructor(
                 val isTriggered = when (alert.condition) {
                     AlertCondition.CROSSES_ABOVE -> prev <= alert.targetPrice && currentPrice >= alert.targetPrice
                     AlertCondition.CROSSES_BELOW -> prev >= alert.targetPrice && currentPrice <= alert.targetPrice
-                    AlertCondition.CANDLE_CLOSES_ABOVE -> candle.close >= alert.targetPrice
-                    AlertCondition.CANDLE_CLOSES_BELOW -> candle.close <= alert.targetPrice
+                    AlertCondition.CANDLE_CLOSES_ABOVE -> candle.isClosed && candle.close >= alert.targetPrice
+                    AlertCondition.CANDLE_CLOSES_BELOW -> candle.isClosed && candle.close <= alert.targetPrice
                 }
                 if (isTriggered) {
                     updatedAlerts = true
@@ -400,16 +401,29 @@ class ChartViewModel @JvmOverloads constructor(
         }
     }
 
+    fun testAlertSound() {
+        playAlertSound(getApplication())
+    }
+
     private fun playAlertSound(context: Context) {
         try {
-            // Use the alarm stream at full ToneGenerator level for a much more noticeable alert.
-            val generator = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-            generator.startTone(ToneGenerator.TONE_PROP_BEEP2, 850)
+            activeAlertRingtone?.stop()
+            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: return
+            val ringtone = RingtoneManager.getRingtone(context.applicationContext, alarmUri) ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone.isLooping = true
+            }
+            activeAlertRingtone = ringtone
+            ringtone.play()
+            // Keep the alert loud and clear, but stop it automatically after 12 seconds.
             Handler(Looper.getMainLooper()).postDelayed({
-                try { generator.release() } catch (_: Exception) { }
-            }, 1000L)
+                try { ringtone.stop() } catch (_: Exception) { }
+                if (activeAlertRingtone === ringtone) activeAlertRingtone = null
+            }, 12_000L)
         } catch (e: Exception) {
-            android.util.Log.e("TradingApp", "Unable to play alert tone", e)
+            android.util.Log.e("TradingApp", "Unable to play alert ringtone", e)
         }
     }
 }

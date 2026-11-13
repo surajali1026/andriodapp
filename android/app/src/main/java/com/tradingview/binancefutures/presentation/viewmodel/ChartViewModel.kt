@@ -293,21 +293,48 @@ class ChartViewModel @JvmOverloads constructor(
 
                 pollJob = viewModelScope.launch {
                     while (isActive && requestId == loadRequestId) {
-                        delay(10_000L)
+                        delay(if (_uiState.value.candles.isEmpty()) 5_000L else 15_000L)
                         try {
-                            if (_uiState.value.connectionStatus != ConnectionStatus.CONNECTED) {
+                            val state = _uiState.value
+                            // A live ticker/WebSocket connection does not prove that historical
+                            // candles loaded. Retry the history endpoint while the chart is empty.
+                            if (state.candles.isEmpty() || state.connectionStatus != ConnectionStatus.CONNECTED) {
                                 val latest = repository.getHistoricalCandles(symbol, tf, pType)
                                 if (isActive && requestId == loadRequestId &&
                                     _uiState.value.symbol == symbol &&
                                     _uiState.value.timeframe == tf &&
                                     _uiState.value.priceType == pType
                                 ) {
-                                    latest.lastOrNull()?.let { handleCandleUpdate(it) }
+                                    val valid = latest.asSequence()
+                                        .filter { c ->
+                                            c.time > 0L && c.open.isFinite() && c.high.isFinite() &&
+                                            c.low.isFinite() && c.close.isFinite() &&
+                                            c.open > 0f && c.high > 0f && c.low > 0f && c.close > 0f &&
+                                            c.high >= maxOf(c.open, c.close, c.low) &&
+                                            c.low <= minOf(c.open, c.close, c.high)
+                                        }
+                                        .sortedBy { it.time }
+                                        .distinctBy { it.time }
+                                        .toList()
+                                        .takeLast(300)
+                                    if (valid.isNotEmpty() && _uiState.value.candles.isEmpty()) {
+                                        previousPrice = valid.last().close
+                                        _uiState.value = _uiState.value.copy(
+                                            candles = valid,
+                                            isLoading = false,
+                                            connectionStatus = ConnectionStatus.CONNECTED,
+                                            errorMessage = null
+                                        )
+                                    } else {
+                                        valid.lastOrNull()?.let { handleCandleUpdate(it) }
+                                    }
                                 }
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
-                        } catch (_: Exception) { }
+                        } catch (error: Exception) {
+                            android.util.Log.w("TradingChart", "Candle history retry failed: ${error.message}")
+                        }
                     }
                 }
             } catch (cancelled: CancellationException) {

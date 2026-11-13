@@ -1,0 +1,1 @@
+ALTER TABLE alerts ADD COLUMN device_id TEXT NOT NULL DEFAULT 'legacy';

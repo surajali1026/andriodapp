@@ -21,23 +21,31 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
   handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true},
   handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true}
  });
+ let currentSymbol=''; let currentFirst=null; let currentLast=null; let currentCount=0;
  const series=chart.addCandlestickSeries({
   upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',
   wickUpColor:'#26a69a',wickDownColor:'#ef5350'
  });
- window.setCandles=function(rows){
+ window.setCandles=function(rows,symbol){
   try{
    const data=(rows||[]).filter(x=>x&&x.time>0&&x.open>0&&x.high>0&&x.low>0&&x.close>0)
     .map(x=>({time:Math.floor(x.time/1000),open:x.open,high:x.high,low:x.low,close:x.close}))
     .sort((a,b)=>a.time-b.time).filter((x,i,a)=>i===0||x.time!==a[i-1].time);
-   if(data.length){series.setData(data);chart.timeScale().fitContent();error.textContent='';}
+   if(data.length){
+    const nextSymbol=symbol||currentSymbol;
+    const first=data[0].time, last=data[data.length-1].time, count=data.length;
+    const sameSeries=nextSymbol===currentSymbol && first===currentFirst;
+    if(!sameSeries || currentCount===0 || count<currentCount || count>currentCount+1){series.setData(data);chart.timeScale().fitContent();}
+    else{series.update(data[data.length-1]);}
+    currentSymbol=nextSymbol;currentFirst=first;currentLast=last;currentCount=count;error.textContent='';
+   }
   }catch(e){error.textContent='Unable to render candles';}
  };
  window.updateCandle=function(x){
   if(!x||!x.time)return;
   try{series.update({time:Math.floor(x.time/1000),open:x.open,high:x.high,low:x.low,close:x.close});}catch(e){}
  };
- window.setSymbolInfo=function(s,tf,pt){document.title=s+' · '+tf+' · '+pt;};
+ window.setSymbolInfo=function(s,tf,pt){document.title=s+' · '+tf+' · '+pt;if(s!==currentSymbol){currentSymbol='';currentCount=0;currentFirst=null;currentLast=null;}};
  new ResizeObserver(()=>chart.applyOptions({width:root.clientWidth,height:root.clientHeight})).observe(root);
  window.chartReady=true;
 })();

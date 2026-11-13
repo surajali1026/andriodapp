@@ -37,6 +37,11 @@ fun TradingViewLightweightChart(
 ) {
     val gson = remember { Gson() }
     val currentOnPriceSelected = rememberUpdatedState(onPriceSelected)
+    val currentPayload = rememberUpdatedState(payload)
+    val currentAlertPayload = rememberUpdatedState(alertPayload)
+    val currentSymbol = rememberUpdatedState(symbol)
+    val currentTimeframe = rememberUpdatedState(timeframe)
+    val currentPriceType = rememberUpdatedState(priceType)
     val bridge = remember {
         ChartAlertBridge { price -> currentOnPriceSelected.value(price) }
     }
@@ -68,9 +73,13 @@ fun TradingViewLightweightChart(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
-                        view.evaluateJavascript("window.setSymbolInfo && window.setSymbolInfo('$symbol','$timeframe','$priceType');", null)
+                        val safeSymbol = currentSymbol.value.replace("'", "")
+                        val safeTimeframe = currentTimeframe.value.replace("'", "")
+                        val safePriceType = currentPriceType.value.replace("'", "")
                         view.evaluateJavascript(
-                            "window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');window.setAlerts && window.setAlerts($alertPayload);",
+                            "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');" +
+                                "window.setCandles && window.setCandles(${currentPayload.value},'$safeSymbol');" +
+                                "window.setAlerts && window.setAlerts(${currentAlertPayload.value});",
                             null
                         )
                     }

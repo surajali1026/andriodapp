@@ -29,6 +29,7 @@ fun AlertsDialogCompose(
     onDismiss: () -> Unit,
     symbol: String,
     currentPrice: Float,
+    initialTargetPrice: Float? = null,
     alerts: List<PriceAlert>,
     onAddAlert: (Float, AlertCondition, Boolean, Boolean) -> Unit,
     onToggleAlert: (String) -> Unit,
@@ -36,8 +37,9 @@ fun AlertsDialogCompose(
 ) {
     if (!isOpen) return
 
-    var targetPriceText by remember(currentPrice) {
-        mutableStateOf(if (currentPrice > 0f) String.format(Locale.US, "%.2f", currentPrice) else "")
+    var targetPriceText by remember(isOpen, initialTargetPrice, currentPrice) {
+        val price = initialTargetPrice ?: currentPrice
+        mutableStateOf(if (price > 0f) String.format(Locale.US, "%.8f", price).trimEnd('0').trimEnd('.') else "")
     }
     var selectedCondition by remember { mutableStateOf(AlertCondition.CROSSES_ABOVE) }
     var soundEnabled by remember { mutableStateOf(true) }

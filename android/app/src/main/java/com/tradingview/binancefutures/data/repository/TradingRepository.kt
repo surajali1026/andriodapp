@@ -1,7 +1,6 @@
 package com.tradingview.binancefutures.data.repository
 
 import com.tradingview.binancefutures.data.remote.BinanceRemoteDataSource
-import com.tradingview.binancefutures.data.remote.BybitRemoteDataSource
 import com.tradingview.binancefutures.domain.model.Candle
 import com.tradingview.binancefutures.domain.model.Timeframe
 import com.tradingview.binancefutures.domain.model.TradingPair
@@ -19,24 +18,23 @@ interface TradingRepository {
 }
 
 /**
- * Binance is used only for the futures watchlist/universe.
- * All chart history and live candle updates come from Bybit.
+ * Public Binance USD-M Futures market data only.
+ * No API key is required for public exchange metadata, klines, or market WebSocket streams.
  */
 class TradingRepositoryImpl(
-    private val binanceWatchlist: BinanceRemoteDataSource = BinanceRemoteDataSource(),
-    private val bybitChart: BybitRemoteDataSource = BybitRemoteDataSource()
+    private val binance: BinanceRemoteDataSource = BinanceRemoteDataSource()
 ) : TradingRepository {
     override suspend fun getFuturesTradingPairs(): List<TradingPair> =
-        binanceWatchlist.getFuturesTickers()
+        binance.getFuturesTickers()
 
     override suspend fun getHistoricalCandles(
         symbol: String,
         timeframe: Timeframe,
         priceType: com.tradingview.binancefutures.domain.model.PriceType
-    ): List<Candle> = bybitChart.getHistoricalKlines(symbol, timeframe)
+    ): List<Candle> = binance.getHistoricalKlines(symbol, timeframe, priceType)
 
     override fun getLiveCandleStream(symbol: String, timeframe: Timeframe): Flow<Candle> =
-        bybitChart.observeLiveKline(symbol, timeframe)
+        binance.observeLiveKline(symbol, timeframe)
 
-    override suspend fun getServerTime(): Long = System.currentTimeMillis()
+    override suspend fun getServerTime(): Long = binance.getServerTime()
 }

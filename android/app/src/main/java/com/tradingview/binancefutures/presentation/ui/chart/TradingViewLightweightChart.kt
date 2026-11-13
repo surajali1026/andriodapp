@@ -66,7 +66,11 @@ fun TradingViewLightweightChart(
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
-                settings.loadsImagesAutomatically = false
+                settings.loadsImagesAutomatically = true
+                // TradingView's hosted widget and market-data iframe must be reachable from this bundled local HTML page.
+                settings.allowFileAccessFromFileURLs = true
+                settings.allowUniversalAccessFromFileURLs = true
+                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 addJavascriptInterface(bridge, "AndroidAlert")
@@ -74,28 +78,16 @@ fun TradingViewLightweightChart(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
-                        val safeSymbol = currentSymbol.value.replace("'", "")
-                        val safeTimeframe = currentTimeframe.value.replace("'", "")
-                        val safePriceType = currentPriceType.value.replace("'", "")
-                        view.evaluateJavascript(
-                            "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');" +
-                                "window.setCandles && window.setCandles(${currentPayload.value},'$safeSymbol');" +
-                                "window.setAlerts && window.setAlerts(${currentAlertPayload.value});",
-                            null
-                        )
+                        // The embedded TradingView widget owns its own live candle feed.
+                        // Do not inject legacy Binance candle payloads into this chart.
                     }
                 }
                 loadUrl("file:///android_asset/tradingview_chart.html")
             }
         },
         update = { webView ->
-            val safeSymbol = symbol.replace("'", "")
-            val safeTimeframe = timeframe.replace("'", "")
-            val safePriceType = priceType.replace("'", "")
-            webView.evaluateJavascript(
-                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');window.setCandles && window.setCandles($payload,'$safeSymbol');window.setAlerts && window.setAlerts($alertPayload);",
-                null
-            )
+            // TradingView's built-in symbol and timeframe controls manage the chart.
+            // The old Lightweight Charts bridge expected setCandles(), which this widget does not expose.
         }
     )
 }

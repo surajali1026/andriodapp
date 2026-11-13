@@ -6,7 +6,7 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
 #error{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ff7777;font:13px Arial}
 #pricePlus{display:none;position:absolute;right:3px;z-index:20;width:28px;height:28px;border:0;border-radius:5px;background:#2962ff;color:#fff;font:bold 22px Arial;line-height:28px;padding:0;box-shadow:0 1px 5px #0008;touch-action:manipulation}
 </style>
-<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
+<script src="lightweight-charts.standalone.production.js"></script>
 </head><body><div id="chart"></div><button id="pricePlus" aria-label="Create alert at this price">+</button><div id="credit">Charting library by TradingView</div><div id="error"></div>
 <script>
 (function(){
@@ -37,7 +37,7 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
     const nextSymbol=symbol||currentSymbol;
     const first=data[0].time, last=data[data.length-1].time, count=data.length;
     const sameSeries=nextSymbol===currentSymbol && first===currentFirst;
-    if(!sameSeries || currentCount===0 || count<currentCount || count>currentCount+1){series.setData(data);chart.timeScale().fitContent();}
+    if(!sameSeries || currentCount===0 || count<currentCount || count>currentCount+1){series.setData(data);if(!sameSeries||currentCount===0)chart.timeScale().fitContent();}
     else{series.update(data[data.length-1]);}
     currentSymbol=nextSymbol;currentFirst=first;currentLast=last;currentCount=count;error.textContent='';
    }

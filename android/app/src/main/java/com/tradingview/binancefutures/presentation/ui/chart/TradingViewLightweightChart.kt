@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.gson.Gson
 import com.tradingview.binancefutures.domain.model.Candle
+import com.tradingview.binancefutures.domain.model.PriceAlert
 import kotlinx.coroutines.delay
 
 @Composable
@@ -18,6 +19,7 @@ fun TradingViewLightweightChart(
     symbol: String,
     timeframe: String,
     priceType: String,
+    alerts: List<PriceAlert> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val gson = Gson()
@@ -30,6 +32,7 @@ fun TradingViewLightweightChart(
             "close" to it.close
         )
     })
+    val alertPayload = gson.toJson(alerts.filter { it.isEnabled && !it.isTriggered }.map { mapOf("id" to it.id, "price" to it.targetPrice) })
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -46,7 +49,7 @@ fun TradingViewLightweightChart(
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
                         view.evaluateJavascript("window.setSymbolInfo && window.setSymbolInfo('$symbol','$timeframe','$priceType');", null)
-                        view.evaluateJavascript("window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');", null)
+                        view.evaluateJavascript("window.setCandles && window.setCandles($payload,'${symbol.replace("'", "")}');window.setAlerts && window.setAlerts($alertPayload);", null)
                     }
                 }
                 loadUrl("file:///android_asset/tradingview_chart.html")
@@ -57,7 +60,7 @@ fun TradingViewLightweightChart(
             val safeTimeframe = timeframe.replace("'", "")
             val safePriceType = priceType.replace("'", "")
             webView.evaluateJavascript(
-                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');window.setCandles && window.setCandles($payload,'$safeSymbol');",
+                "window.setSymbolInfo && window.setSymbolInfo('$safeSymbol','$safeTimeframe','$safePriceType');window.setCandles && window.setCandles($payload,'$safeSymbol');window.setAlerts && window.setAlerts($alertPayload);",
                 null
             )
         }

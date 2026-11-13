@@ -1,3 +1,3 @@
-# Android App
+# Suraj New Web App
 
-Working copy of the trading chart application.
+Copied project from surajnewchart. Web app conversion will follow.

@@ -45,7 +45,7 @@ html,body,#chart{width:100%;height:100%;margin:0;padding:0;overflow:hidden;backg
   if(!x||!x.time)return;
   try{series.update({time:Math.floor(x.time/1000),open:x.open,high:x.high,low:x.low,close:x.close});}catch(e){}
  };
- window.setSymbolInfo=function(s,tf,pt){document.title=s+' · '+tf+' · '+pt;if(s!==currentSymbol){currentSymbol='';currentCount=0;currentFirst=null;currentLast=null;}};
+ window.setSymbolInfo=function(s,tf,pt){document.title=s+' · '+tf+' · '+pt;if(s!==currentSymbol){currentCount=0;currentFirst=null;currentLast=null;currentSymbol=s;}};
  new ResizeObserver(()=>chart.applyOptions({width:root.clientWidth,height:root.clientHeight})).observe(root);
  window.chartReady=true;
 })();

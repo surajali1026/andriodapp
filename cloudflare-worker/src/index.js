@@ -24,11 +24,12 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ ok: false, error: "Invalid JSON body." }, 400); }
       const token = String(body.token || "");
+      const deviceId = String(body.deviceId || "").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64);
       const platform = String(body.platform || "android").slice(0, 20);
-      if (token.length < 40 || token.length > 4096) return json({ ok: false, error: "Invalid FCM token." }, 400);
+      if (!deviceId || token.length < 40 || token.length > 4096) return json({ ok: false, error: "Invalid FCM token." }, 400);
       await env.ALERTS_DB.prepare(
-        "INSERT INTO devices (id, fcm_token, platform, updated_at) VALUES ('primary', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET fcm_token = excluded.fcm_token, platform = excluded.platform, updated_at = excluded.updated_at"
-      ).bind(token, platform, new Date().toISOString()).run();
+        "INSERT INTO devices (id, fcm_token, platform, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET fcm_token = excluded.fcm_token, platform = excluded.platform, updated_at = excluded.updated_at"
+      ).bind(deviceId, token, platform, new Date().toISOString()).run();
       return json({ ok: true, registered: true });
     }
 
@@ -41,40 +42,42 @@ export default {
       });
     }
 
-    if (!authorized(request, env)) {
-      return json({ ok: false, error: "Unauthorized. Configure ALERT_API_KEY and send it as a Bearer token." }, 401);
-    }
     if (!env.ALERTS_DB) return json({ ok: false, error: "D1 database is not connected yet." }, 503);
 
     if (url.pathname === "/api/alerts" && request.method === "GET") {
+      const deviceId = String(url.searchParams.get("deviceId") || "");
+      if (!deviceId) return json({ ok: false, error: "deviceId required" }, 400);
       const { results } = await env.ALERTS_DB.prepare(
-        "SELECT id, symbol, condition, target_price, price_type, status, created_at, triggered_at FROM alerts ORDER BY created_at DESC"
-      ).all();
+        "SELECT id, symbol, condition, target_price, price_type, status, created_at, triggered_at FROM alerts WHERE device_id = ? ORDER BY created_at DESC"
+      ).bind(deviceId).all();
       return json({ ok: true, alerts: results });
     }
 
     if (url.pathname === "/api/alerts" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ ok: false, error: "Invalid JSON body." }, 400); }
+      const deviceId = String(body.deviceId || "").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64);
       const symbol = String(body.symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
       const condition = String(body.condition || "");
       const targetPrice = Number(body.targetPrice);
       const priceType = String(body.priceType || "LAST").toUpperCase();
       const allowedConditions = ["CROSSES_ABOVE", "CROSSES_BELOW", "CANDLE_CLOSES_ABOVE", "CANDLE_CLOSES_BELOW"];
-      if (!/^[A-Z0-9]{3,30}$/.test(symbol) || !Number.isFinite(targetPrice) || targetPrice <= 0 ||
+      if (!deviceId || !/^[A-Z0-9]{3,30}$/.test(symbol) || !Number.isFinite(targetPrice) || targetPrice <= 0 ||
           !allowedConditions.includes(condition) || !["LAST", "MARK", "INDEX"].includes(priceType)) {
         return json({ ok: false, error: "Provide symbol, positive targetPrice, valid condition and priceType." }, 400);
       }
-      const id = crypto.randomUUID();
+      const id = String(body.id || crypto.randomUUID()).slice(0, 64);
       await env.ALERTS_DB.prepare(
-        "INSERT INTO alerts (id, symbol, condition, target_price, price_type, status, created_at, last_price) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, NULL)"
-      ).bind(id, symbol, condition, targetPrice, priceType, new Date().toISOString()).run();
+        "INSERT OR REPLACE INTO alerts (id, device_id, symbol, condition, target_price, price_type, status, created_at, last_price) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, NULL)"
+      ).bind(id, deviceId, symbol, condition, targetPrice, priceType, new Date().toISOString()).run();
       return json({ ok: true, id });
     }
 
     const deleteMatch = url.pathname.match(/^\/api\/alerts\/([a-f0-9-]+)$/i);
     if (deleteMatch && request.method === "DELETE") {
-      await env.ALERTS_DB.prepare("DELETE FROM alerts WHERE id = ?").bind(deleteMatch[1]).run();
+      const deviceId = String(url.searchParams.get("deviceId") || "");
+      if (!deviceId) return json({ ok: false, error: "deviceId required" }, 400);
+      await env.ALERTS_DB.prepare("DELETE FROM alerts WHERE id = ? AND device_id = ?").bind(deleteMatch[1], deviceId).run();
       return json({ ok: true });
     }
     return json({ ok: false, error: "Not found." }, 404);
@@ -175,14 +178,11 @@ async function runAlertMonitor(env) {
     return;
   }
   const { results: alerts } = await env.ALERTS_DB.prepare(
-    "SELECT id, symbol, condition, target_price, price_type, last_price FROM alerts WHERE status = 'ACTIVE' LIMIT 100"
+    "SELECT id, device_id, symbol, condition, target_price, price_type, last_price FROM alerts WHERE status = 'ACTIVE' LIMIT 100"
   ).all();
   if (!alerts.length) return;
-  const { results: devices } = await env.ALERTS_DB.prepare("SELECT fcm_token FROM devices").all();
-  if (!devices.length) {
-    console.log("No registered FCM devices yet.");
-    return;
-  }
+  const { results: devices } = await env.ALERTS_DB.prepare("SELECT id, fcm_token FROM devices").all();
+  const devicesById = new Map(devices.map(d => [d.id, d]));
 
   const cache = new Map();
   for (const alert of alerts) {
@@ -199,7 +199,7 @@ async function runAlertMonitor(env) {
         const closedPrice = Number(candles[candles.length - 2]?.[4]);
         const hit = alert.condition === "CANDLE_CLOSES_ABOVE"
           ? closedPrice >= alert.target_price : closedPrice <= alert.target_price;
-        if (hit) await triggerAlert(env, alert, devices, closedPrice, "1m candle close");
+        if (hit) await triggerAlert(env, alert, devicesById, closedPrice, "1m candle close");
         continue;
       }
 
@@ -218,14 +218,15 @@ async function runAlertMonitor(env) {
   }
 }
 
-async function triggerAlert(env, alert, devices, price, label) {
+async function triggerAlert(env, alert, devicesById, price, label) {
   const changed = await env.ALERTS_DB.prepare(
-    "UPDATE alerts SET status = 'TRIGGERED', triggered_at = ? WHERE id = ? AND status = 'ACTIVE'"
-  ).bind(new Date().toISOString(), alert.id).run();
+    "UPDATE alerts SET status = 'TRIGGERED', triggered_at = ? WHERE id = ? AND device_id = ? AND status = 'ACTIVE'"
+  ).bind(new Date().toISOString(), alert.id, alert.device_id).run();
   if (!changed.meta?.changes) return;
   const title = alert.symbol + " price alert";
   const body = `${label} crossed ${alert.condition === "CROSSES_ABOVE" || alert.condition === "CANDLE_CLOSES_ABOVE" ? "above" : "below"} ${alert.target_price}. Current: ${price}`;
-  for (const device of devices) {
+  const device = devicesById.get(alert.device_id);
+  if (device) {
     try { await sendPush(env, device.fcm_token, title, body); }
     catch (error) { console.error("Push delivery failed:", String(error)); }
   }
